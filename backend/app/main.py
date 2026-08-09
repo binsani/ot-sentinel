@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.exports import router as exports_router
 from app.ingestion import router as ingestion_router
 from app.inventory import router as inventory_router
+from app.probing import router as probing_router
 
 app = FastAPI(
     title=get_settings().app_name,
@@ -20,6 +21,7 @@ app.include_router(inventory_router)
 app.include_router(exports_router)
 app.include_router(admin_router)
 app.include_router(alerting_router)
+app.include_router(probing_router)
 
 
 @app.middleware("http")

@@ -22,6 +22,7 @@ a site-specific risk assessment.
 |---|---|---|
 | Crafted packets exploit a parser | strict lengths, bounded protocol frames, metadata-only decoding, parser tests | Python/Scapy defects and untested protocol variants |
 | Sensor accidentally affects field devices | fixed passive capture filter; no send, replay, or active-probe code path | host misconfiguration outside the application |
+| Active discovery disrupts control equipment | global gate defaults off, disabled policies, CIDR allowlists, expiring approval, maintenance windows, target/rate caps, no executor shipped | a future executor must preserve every gate and undergo field safety validation |
 | Duplicate or interrupted forwarding corrupts inventory | deterministic event IDs, database advisory locks, unique constraint | events from legacy sensors without IDs are not idempotent |
 | Stolen credentials expose inventory | OIDC validation, role checks, no-store responses, secrets excluded from audit data | bootstrap keys require operator rotation and secure storage |
 | Audit history is altered | append-only database trigger, serialized SHA-256 chain, verification endpoint | a privileged database administrator can replace both data and backups |
