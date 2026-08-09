@@ -91,4 +91,5 @@ Licensed under Apache-2.0. See [LICENSE](LICENSE).
 Operational guidance is available in [`docs/architecture.md`](docs/architecture.md),
 [`docs/deployment-airgapped.md`](docs/deployment-airgapped.md),
 [`docs/threat-model.md`](docs/threat-model.md), and
-[`docs/backup-restore.md`](docs/backup-restore.md).
+[`docs/backup-restore.md`](docs/backup-restore.md). Site commissioning must follow
+[`docs/field-acceptance.md`](docs/field-acceptance.md).
