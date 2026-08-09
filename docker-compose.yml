@@ -23,6 +23,7 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY:?Set ADMIN_API_KEY in .env}
       WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
       ACTIVE_PROBING_ENABLED: ${ACTIVE_PROBING_ENABLED:-false}
+      SIEM_ALLOWED_CIDRS: ${SIEM_ALLOWED_CIDRS:-}
       BOOTSTRAP_API_KEYS_ENABLED: ${BOOTSTRAP_API_KEYS_ENABLED:-true}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
@@ -110,6 +111,21 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
       WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  siem-worker:
+    profiles: ["siem"]
+    build: ./backend
+    command: ["python", "-m", "app.siem_worker", "--watch"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      SIEM_ALLOWED_CIDRS: ${SIEM_ALLOWED_CIDRS:-}
     depends_on:
       db:
         condition: service_healthy

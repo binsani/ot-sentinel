@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     oidc_jwks_file: str | None = None
     webhook_signing_secret: SecretStr | None = None
     active_probing_enabled: bool = False
+    siem_allowed_cidrs: str = ""
 
     @model_validator(mode="after")
     def validate_authentication_configuration(self) -> Self:
