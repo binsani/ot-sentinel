@@ -11,6 +11,7 @@ from app.ingestion import router as ingestion_router
 from app.inventory import router as inventory_router
 from app.probing import router as probing_router
 from app.risk import router as risk_router
+from app.siem import router as siem_router
 
 app = FastAPI(
     title=get_settings().app_name,
@@ -24,6 +25,7 @@ app.include_router(exports_router)
 app.include_router(admin_router)
 app.include_router(alerting_router)
 app.include_router(probing_router)
+app.include_router(siem_router)
 
 
 @app.middleware("http")

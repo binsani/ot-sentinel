@@ -18,6 +18,7 @@ from app.auth import Principal, require_admin
 from app.config import get_settings
 from app.database import get_session
 from app.models import AlertDelivery, AlertRule
+from app.siem import enqueue_siem_event, event_severity
 
 router = APIRouter(prefix="/api/v1/admin/alerts", tags=["alerting"])
 EventType = Literal["firmware_drift", "vulnerability_match"]
@@ -164,6 +165,12 @@ def enqueue_alert(
     for rule in rules:
         session.add(AlertDelivery(rule_id=rule.id, event_type=event_type, payload=envelope))
         count += 1
+    enqueue_siem_event(
+        session,
+        event_type=event_type,
+        severity=event_severity(event_type, payload),
+        payload={"site_id": site_id, **payload},
+    )
     return count
 
 
