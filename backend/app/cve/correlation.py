@@ -7,6 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.alerting import enqueue_alert
 from app.models import Asset, CveMatch, MatchStatus, Vulnerability
 
 
@@ -17,6 +18,9 @@ def correlate_assets(session: Session) -> int:
     )
     vulnerabilities = session.scalars(select(Vulnerability)).all()
     for asset in assets:
+        existing_cves = set(
+            session.scalars(select(CveMatch.cve_id).where(CveMatch.asset_id == asset.id))
+        )
         matched_cves: set[str] = set()
         for vulnerability in vulnerabilities:
             result = match_asset(asset, vulnerability.cpe_matches)
@@ -68,6 +72,20 @@ def correlate_assets(session: Session) -> int:
                 },
             )
             session.execute(statement)
+            if vulnerability.cve_id not in existing_cves:
+                enqueue_alert(
+                    session,
+                    event_type="vulnerability_match",
+                    site_id=asset.site_id,
+                    payload={
+                        "asset_id": str(asset.id),
+                        "ip_address": str(asset.ip_address),
+                        "cve_id": vulnerability.cve_id,
+                        "severity": vulnerability.severity,
+                        "cvss_score": vulnerability.cvss_score,
+                        "known_exploited": vulnerability.known_exploited,
+                    },
+                )
             count += 1
         stale = update(CveMatch).where(
             CveMatch.asset_id == asset.id,

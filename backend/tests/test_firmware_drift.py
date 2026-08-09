@@ -27,6 +27,7 @@ def test_firmware_drift_transition_is_audited(monkeypatch: pytest.MonkeyPatch) -
     asset = _asset()
     audit = Mock()
     monkeypatch.setattr(ingestion, "append_audit_log", audit)
+    monkeypatch.setattr(ingestion, "enqueue_alert", Mock(return_value=1))
     observed_at = datetime.now(UTC)
 
     ingestion._apply_firmware_version(Mock(), asset, "2.0", observed_at, "tap-01")

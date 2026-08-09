@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from starlette.responses import Response
 
 from app.admin import router as admin_router
+from app.alerting import router as alerting_router
 from app.config import get_settings
 from app.exports import router as exports_router
 from app.ingestion import router as ingestion_router
@@ -18,6 +19,7 @@ app.include_router(ingestion_router)
 app.include_router(inventory_router)
 app.include_router(exports_router)
 app.include_router(admin_router)
+app.include_router(alerting_router)
 
 
 @app.middleware("http")

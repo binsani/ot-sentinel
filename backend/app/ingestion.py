@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.alerting import enqueue_alert
 from app.audit import append_audit_log
 from app.config import get_settings
 from app.database import get_session
@@ -188,6 +189,17 @@ def _apply_firmware_version(
     is_drifted = bool(asset.firmware_baseline and version != asset.firmware_baseline)
     if is_drifted and not was_drifted:
         asset.firmware_drift_detected_at = observed_at
+        enqueue_alert(
+            session,
+            event_type="firmware_drift",
+            site_id=asset.site_id,
+            payload={
+                "asset_id": str(asset.id),
+                "ip_address": str(asset.ip_address),
+                "baseline": asset.firmware_baseline,
+                "observed": version,
+            },
+        )
         append_audit_log(
             session,
             action="firmware.drift_detected",
