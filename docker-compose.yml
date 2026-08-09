@@ -21,6 +21,7 @@ services:
       SENSOR_INGEST_API_KEY: ${SENSOR_INGEST_API_KEY:?Set SENSOR_INGEST_API_KEY in .env}
       VIEWER_API_KEY: ${VIEWER_API_KEY:?Set VIEWER_API_KEY in .env}
       ADMIN_API_KEY: ${ADMIN_API_KEY:?Set ADMIN_API_KEY in .env}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
       BOOTSTRAP_API_KEYS_ENABLED: ${BOOTSTRAP_API_KEYS_ENABLED:-true}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
@@ -93,6 +94,21 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY:?Set ADMIN_API_KEY in .env}
     volumes:
       - ${FEED_DIRECTORY:-./feeds}:/feeds:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  alert-worker:
+    profiles: ["alerts"]
+    build: ./backend
+    command: ["python", "-m", "app.alert_worker", "--watch"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
     depends_on:
       db:
         condition: service_healthy

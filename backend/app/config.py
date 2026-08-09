@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     oidc_audience: str | None = None
     oidc_jwks_url: str | None = None
     oidc_jwks_file: str | None = None
+    webhook_signing_secret: SecretStr | None = None
 
     @model_validator(mode="after")
     def validate_authentication_configuration(self) -> Self:
