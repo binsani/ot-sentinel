@@ -1,0 +1,106 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ot_sentinel}
+      POSTGRES_USER: ${POSTGRES_USER:-ot_sentinel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      SENSOR_INGEST_API_KEY: ${SENSOR_INGEST_API_KEY:?Set SENSOR_INGEST_API_KEY in .env}
+      VIEWER_API_KEY: ${VIEWER_API_KEY:?Set VIEWER_API_KEY in .env}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?Set ADMIN_API_KEY in .env}
+      BOOTSTRAP_API_KEYS_ENABLED: ${BOOTSTRAP_API_KEYS_ENABLED:-true}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-}
+      OIDC_JWKS_FILE: ${OIDC_JWKS_FILE:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3000:8080"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+
+  sensor-forwarder:
+    profiles: ["sensor"]
+    build: ./sensor
+    command:
+      - forward
+      - --spool
+      - /var/lib/ot-sentinel
+      - --backend-url
+      - http://backend:8000
+      - --sensor-id
+      - ${SENSOR_ID:-sensor-01}
+      - --site-id
+      - ${SITE_ID:-default}
+      - --allow-http
+    environment:
+      SENSOR_INGEST_API_KEY: ${SENSOR_INGEST_API_KEY:?Set SENSOR_INGEST_API_KEY in .env}
+    volumes:
+      - sensor_spool:/var/lib/ot-sentinel
+    depends_on:
+      - backend
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  feed-worker:
+    profiles: ["feeds"]
+    build: ./backend
+    command:
+      - python
+      - -m
+      - app.cve.cli
+      - --watch-directory
+      - /feeds
+      - --interval-seconds
+      - ${FEED_INTERVAL_SECONDS:-3600}
+      - --correlate
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      SENSOR_INGEST_API_KEY: ${SENSOR_INGEST_API_KEY:?Set SENSOR_INGEST_API_KEY in .env}
+      VIEWER_API_KEY: ${VIEWER_API_KEY:?Set VIEWER_API_KEY in .env}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?Set ADMIN_API_KEY in .env}
+    volumes:
+      - ${FEED_DIRECTORY:-./feeds}:/feeds:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+volumes:
+  postgres_data:
+  sensor_spool:

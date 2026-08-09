@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body { @apply m-0 min-w-80 bg-slate-950 antialiased; }
+  button, input { @apply outline-none; }
+  button:focus-visible, input:focus-visible { @apply ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950; }
+}
+
+@layer components {
+  .panel { @apply rounded-lg border border-slate-800 bg-slate-900/30 shadow-sm; }
+  .input { @apply rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600; }
+  .button-primary { @apply rounded-md bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50; }
+  .button-secondary { @apply rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-300 hover:border-slate-600 hover:text-white disabled:opacity-50; }
+  .badge { @apply inline-flex rounded border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-slate-300; }
+  .badge-danger { @apply inline-flex rounded border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-300; }
+  .section-title { @apply text-xs font-semibold uppercase tracking-wider text-slate-400; }
+}

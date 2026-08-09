@@ -1,0 +1,19 @@
+name: Release build
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: release-build-placeholder
+      DATABASE_URL: postgresql+psycopg://ot_sentinel:release-build-placeholder@db:5432/ot_sentinel
+      SENSOR_INGEST_API_KEY: release-build-placeholder
+      VIEWER_API_KEY: release-build-placeholder
+      ADMIN_API_KEY: release-build-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --profile sensor --profile feeds config --quiet
+      - run: docker compose --profile sensor --profile feeds build

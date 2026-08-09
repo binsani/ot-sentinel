@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ot-sentinel-sensor"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["scapy>=2.6,<3"]
+
+[project.scripts]
+ot-sentinel-sensor = "ot_sentinel_sensor.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3,<9", "ruff>=0.8,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ot_sentinel_sensor"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

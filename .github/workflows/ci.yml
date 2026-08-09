@@ -1,0 +1,87 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ot_sentinel_test
+          POSTGRES_USER: ot_sentinel
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ot_sentinel -d ot_sentinel_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ot_sentinel:ci-postgres-password@localhost:5432/ot_sentinel_test
+      INTEGRATION_DATABASE_URL: postgresql+psycopg://ot_sentinel:ci-postgres-password@localhost:5432/ot_sentinel_test
+      SENSOR_INGEST_API_KEY: ci-sensor-key-long-enough-for-testing
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install uv==0.12.3
+      - run: uv sync --frozen --extra dev
+      - run: uv run ruff check .
+      - run: uv run mypy app
+      - run: uv run alembic upgrade head
+      - run: uv run pytest
+  sensor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sensor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install uv==0.12.3
+      - run: uv sync --frozen --extra dev
+      - run: uv run python ../scripts/fetch-test-captures.py
+      - run: uv run ruff check . ../scripts/fetch-test-captures.py
+      - run: uv run pytest
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+  containers:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-postgres-password
+      DATABASE_URL: postgresql+psycopg://ot_sentinel:ci-postgres-password@db:5432/ot_sentinel
+      SENSOR_INGEST_API_KEY: ci-sensor-key-not-for-production
+      VIEWER_API_KEY: ci-viewer-key-not-for-production
+      ADMIN_API_KEY: ci-admin-key-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --profile sensor --profile feeds config --quiet
+      - run: docker compose --profile sensor --profile feeds build

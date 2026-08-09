@@ -1,0 +1,18 @@
+[
+  {
+    "filename": "modbus_write_single_coil.pcap",
+    "url": "https://raw.githubusercontent.com/biero-el-corridor/Bettercap_ICS/5f331bc08ddc4e3e915e137e113febe52da5f83b/sample/modbus_packet/modbus_write_single_coil.pcap",
+    "sha256": "4273f0cf5c935b73da4e8aa51b313d46f00dbe08bfd3b41f768e64d2bd61984b",
+    "source": "biero-el-corridor/Bettercap_ICS",
+    "license": "GPL-3.0",
+    "upstream_commit": "5f331bc08ddc4e3e915e137e113febe52da5f83b"
+  },
+  {
+    "filename": "opcua-encrypted.pcapng",
+    "url": "https://raw.githubusercontent.com/wireshark/wireshark/7535a276634f76e32b19f849ee2a4a3425bcc440/test/captures/opcua-encrypted.pcapng",
+    "sha256": "8516144f882c6b10a70213c859f763cd301a132c18eb84341b333a548e9ad7eb",
+    "source": "Wireshark Foundation/wireshark",
+    "license": "GPL-2.0",
+    "upstream_commit": "7535a276634f76e32b19f849ee2a4a3425bcc440"
+  }
+]
