@@ -53,6 +53,15 @@ export type FeedStatus = {
   }>
 }
 
+export type SiteSummary = {
+  site_id: string
+  asset_count: number
+  last_seen: string
+  firmware_drift_count: number
+  vulnerability_matches: number
+  vulnerable_assets: number
+}
+
 export type AuditEntry = {
   id: number
   occurred_at: string

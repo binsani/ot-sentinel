@@ -1,22 +1,24 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from './api'
-import type { Asset, AuditEntry, FeedStatus, GraphData } from './types'
+import type { Asset, AuditEntry, FeedStatus, GraphData, SiteSummary } from './types'
 
 const NetworkGraph = lazy(() =>
   import('./NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
 )
 
-type View = 'inventory' | 'graph' | 'administration'
+type View = 'inventory' | 'sites' | 'graph' | 'administration'
 
 export default function App() {
   const [apiKey, setApiKey] = useState('')
   const [draftKey, setDraftKey] = useState('')
   const [assets, setAssets] = useState<Asset[]>([])
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] })
+  const [sites, setSites] = useState<SiteSummary[]>([])
   const [selected, setSelected] = useState<Asset | null>(null)
   const [view, setView] = useState<View>('inventory')
   const [query, setQuery] = useState('')
+  const [siteFilter, setSiteFilter] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [inventoryAsOf, setInventoryAsOf] = useState(0)
@@ -27,9 +29,10 @@ export default function App() {
     setLoading(true)
     setError('')
     try {
-      const [assetRows, graphData] = await Promise.all([api.assets(key), api.graph(key)])
+      const [assetRows, graphData, siteRows] = await Promise.all([api.assets(key), api.graph(key), api.sites(key)])
       setAssets(assetRows)
       setGraph(graphData)
+      setSites(siteRows)
       setInventoryAsOf(Date.now())
       try {
         const [feeds, audit] = await Promise.all([api.feedStatus(key), api.audit(key)])
@@ -94,13 +97,12 @@ export default function App() {
 
   const visibleAssets = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
-    if (!needle) return assets
     return assets.filter((asset) =>
-      [asset.ip_address, asset.hostname, asset.vendor, asset.model, ...asset.protocols]
+      (!siteFilter || asset.site_id === siteFilter) && (!needle || [asset.ip_address, asset.hostname, asset.vendor, asset.model, ...asset.protocols]
         .filter(Boolean)
-        .some((value) => String(value).toLocaleLowerCase().includes(needle)),
+        .some((value) => String(value).toLocaleLowerCase().includes(needle))),
     )
-  }, [assets, query])
+  }, [assets, query, siteFilter])
 
   const staleCount = assets.filter(
     (asset) => inventoryAsOf - new Date(asset.last_seen).getTime() > 24 * 60 * 60 * 1000,
@@ -144,6 +146,7 @@ export default function App() {
 
         <nav className="mb-4 flex gap-1 border-b border-slate-800" aria-label="Dashboard views">
           <Tab active={view === 'inventory'} onClick={() => setView('inventory')}>Asset inventory</Tab>
+          <Tab active={view === 'sites'} onClick={() => setView('sites')}>Sites</Tab>
           <Tab active={view === 'graph'} onClick={() => setView('graph')}>Communication graph</Tab>
           {auditEvents && <Tab active={view === 'administration'} onClick={() => setView('administration')}>Administration</Tab>}
         </nav>
@@ -152,11 +155,12 @@ export default function App() {
           <section className="panel overflow-hidden">
             <div className="flex flex-col gap-3 border-b border-slate-800 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div><h2 className="font-medium">Asset inventory</h2><p className="mt-1 text-xs text-slate-500">Select an asset to review fingerprints and CVE matches.</p></div>
-              <label className="sr-only" htmlFor="asset-search">Search assets</label>
-              <input id="asset-search" className="input w-full sm:w-80" placeholder="Search IP, vendor, model…" value={query} onChange={(event) => setQuery(event.target.value)} />
+              <div className="flex w-full gap-2 sm:w-auto"><label className="sr-only" htmlFor="site-filter">Filter by site</label><select id="site-filter" className="input" value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)}><option value="">All sites</option>{sites.map((site) => <option key={site.site_id} value={site.site_id}>{site.site_id}</option>)}</select><label className="sr-only" htmlFor="asset-search">Search assets</label><input id="asset-search" className="input w-full sm:w-80" placeholder="Search IP, vendor, model…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
             </div>
             <AssetTable assets={visibleAssets} selectAsset={selectAsset} />
           </section>
+        ) : view === 'sites' ? (
+          <SitesPanel sites={sites} openSite={(siteId) => { setSiteFilter(siteId); setView('inventory') }} />
         ) : view === 'graph' ? (
           <section className="panel overflow-hidden">
             <div className="border-b border-slate-800 p-4"><h2 className="font-medium">Observed communications</h2><p className="mt-1 text-xs text-slate-500">Edges reflect passively observed protocol traffic. Node placement has no physical-network meaning.</p></div>
@@ -188,6 +192,11 @@ function Tab({ active, onClick, children }: { active: boolean; onClick: () => vo
 function AssetTable({ assets, selectAsset }: { assets: Asset[]; selectAsset: (asset: Asset) => void }) {
   if (assets.length === 0) return <p className="p-10 text-center text-sm text-slate-500">No assets match the current view.</p>
   return <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Address</th><th className="px-4 py-3">Identity</th><th className="px-4 py-3">Protocols</th><th className="px-4 py-3">Site</th><th className="px-4 py-3">Last seen</th><th className="px-4 py-3"><span className="sr-only">Open</span></th></tr></thead><tbody className="divide-y divide-slate-800">{assets.map((asset) => <tr key={asset.id} className="hover:bg-slate-900/70"><td className="px-4 py-3 font-mono text-emerald-300">{asset.ip_address}<span className="mt-1 block text-xs text-slate-600">{asset.mac_address ?? 'MAC unknown'}</span></td><td className="px-4 py-3">{[asset.vendor, asset.model].filter(Boolean).join(' ') || asset.hostname || 'Unidentified device'}<span className="mt-1 block text-xs text-slate-500">{asset.firmware_version ? `Firmware ${asset.firmware_version}` : 'Firmware unknown'}</span></td><td className="px-4 py-3"><div className="flex flex-wrap gap-1">{asset.protocols.map((protocol) => <span key={protocol} className="badge">{protocol}</span>)}</div></td><td className="px-4 py-3 text-slate-400">{asset.site_id}</td><td className="px-4 py-3 text-slate-400">{formatTime(asset.last_seen)}</td><td className="px-4 py-3"><button className="text-emerald-300 hover:text-emerald-200" onClick={() => void selectAsset(asset)}>Review</button></td></tr>)}</tbody></table></div>
+}
+
+function SitesPanel({ sites, openSite }: { sites: SiteSummary[]; openSite: (siteId: string) => void }) {
+  if (sites.length === 0) return <section className="panel p-10 text-center text-sm text-slate-500">No sites are reporting inventory.</section>
+  return <section className="panel overflow-hidden"><div className="border-b border-slate-800 p-4"><h2 className="font-medium">Site overview</h2><p className="mt-1 text-xs text-slate-500">Aggregated operational exposure across reporting locations.</p></div><div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{sites.map((site) => <article key={site.site_id} className="rounded-md border border-slate-800 bg-slate-900/40 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-mono font-semibold text-emerald-300">{site.site_id}</h3><p className="mt-1 text-xs text-slate-500">Last seen {formatTime(site.last_seen)}</p></div><button className="button-secondary" onClick={() => openSite(site.site_id)}>Open inventory</button></div><dl className="mt-4 grid grid-cols-2 gap-3"><Fact label="Assets" value={String(site.asset_count)} /><Fact label="Vulnerable assets" value={String(site.vulnerable_assets)} /><Fact label="CVE matches" value={String(site.vulnerability_matches)} /><Fact label="Firmware drift" value={String(site.firmware_drift_count)} /></dl></article>)}</div></section>
 }
 
 function AssetDrawer({ asset, close, canAdmin, baselineFirmware }: { asset: Asset; close: () => void; canAdmin: boolean; baselineFirmware: (asset: Asset) => Promise<void> }) {

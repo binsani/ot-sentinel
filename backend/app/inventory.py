@@ -2,13 +2,13 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.audit import append_audit_log
 from app.auth import Principal, require_viewer
 from app.database import get_session
-from app.models import Asset, CveMatch, Observation
+from app.models import Asset, CveMatch, MatchStatus, Observation
 
 router = APIRouter(
     prefix="/api/v1/assets",
@@ -86,6 +86,75 @@ def communication_graph(
         object_type="communication_graph",
         object_id=None,
         details={"site_id": site_id, "limit": limit, "edge_count": len(rows)},
+    )
+    return result
+
+
+@router.get("/sites/summary")
+def site_summary(
+    principal: Principal = Depends(require_viewer),
+    session: Session = Depends(get_session),
+) -> list[dict[str, Any]]:
+    vulnerability_totals = (
+        select(
+            Asset.site_id.label("site_id"),
+            func.count(CveMatch.id).label("vulnerability_matches"),
+            func.count(func.distinct(CveMatch.asset_id)).label("vulnerable_assets"),
+        )
+        .join(CveMatch, CveMatch.asset_id == Asset.id)
+        .where(CveMatch.status != MatchStatus.REJECTED)
+        .group_by(Asset.site_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(
+            Asset.site_id,
+            func.count(Asset.id).label("asset_count"),
+            func.max(Asset.last_seen).label("last_seen"),
+            func.sum(
+                case(
+                    (
+                        Asset.firmware_baseline.is_not(None)
+                        & Asset.firmware_version.is_not(None)
+                        & (Asset.firmware_baseline != Asset.firmware_version),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("firmware_drift_count"),
+            func.coalesce(
+                vulnerability_totals.c.vulnerability_matches, 0
+            ).label("vulnerability_matches"),
+            func.coalesce(vulnerability_totals.c.vulnerable_assets, 0).label(
+                "vulnerable_assets"
+            ),
+        )
+        .outerjoin(vulnerability_totals, vulnerability_totals.c.site_id == Asset.site_id)
+        .group_by(
+            Asset.site_id,
+            vulnerability_totals.c.vulnerability_matches,
+            vulnerability_totals.c.vulnerable_assets,
+        )
+        .order_by(func.count(Asset.id).desc(), Asset.site_id)
+    ).all()
+    result = [
+        {
+            "site_id": row.site_id,
+            "asset_count": int(row.asset_count),
+            "last_seen": row.last_seen,
+            "firmware_drift_count": int(row.firmware_drift_count),
+            "vulnerability_matches": int(row.vulnerability_matches),
+            "vulnerable_assets": int(row.vulnerable_assets),
+        }
+        for row in rows
+    ]
+    _audit_inventory_read(
+        session,
+        principal,
+        action="sites.viewed",
+        object_type="site_collection",
+        object_id=None,
+        details={"count": len(result)},
     )
     return result
 
