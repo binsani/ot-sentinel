@@ -15,7 +15,7 @@ The API container applies database migrations before starting. PostgreSQL is onl
 
 ## Phase 1 capabilities
 
-- Passive Modbus TCP, DNP3, S7comm, and OPC UA metadata observation
+- Passive Modbus TCP, DNP3, S7comm, IEC 61850 MMS, and OPC UA metadata observation
 - Rotating capture spool with disconnected authenticated forwarding and retry-safe event IDs
 - Typed SQLAlchemy models, PostgreSQL constraints, and Alembic migrations
 - NVD, CISA KEV, and CISA ICS-advisory reference correlation
@@ -28,7 +28,8 @@ The API container applies database migrations before starting. PostgreSQL is onl
 ## Passive sensor
 
 The sensor passively captures only configured OT protocol ports from a TAP/SPAN interface into
-rotating PCAP files, or parses existing PCAPs for Modbus TCP, DNP3, S7comm, and OPC UA metadata.
+rotating PCAP files, or parses existing PCAPs for Modbus TCP, DNP3, S7comm, IEC 61850 MMS,
+and OPC UA metadata.
 Capture and forwarding are separate commands for disconnected deployments. The authenticated
 forwarder retries safely using deterministic event IDs, and archives delivered PCAPs rather than
 deleting evidence. No sensor component transmits traffic to field devices.

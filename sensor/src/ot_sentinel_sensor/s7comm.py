@@ -106,6 +106,8 @@ def _parse_connection(cotp: bytes, pdu_type: int, digest: str) -> S7Message:
     destination = parameters.get(0xC2)
     device_tsap = destination if pdu_type == 0xE0 else source
     rack, slot = _rack_slot(device_tsap)
+    if rack is None or slot is None:
+        raise S7ParseError("COTP setup does not contain a recognized S7 TSAP")
     fields: dict[str, Any] = {}
     if 0xC0 in parameters and len(parameters[0xC0]) == 1:
         fields["tpdu_size_exponent"] = parameters[0xC0][0]
@@ -195,4 +197,3 @@ def _rack_slot(tsap: bytes | None) -> tuple[int | None, int | None]:
     if tsap is None or len(tsap) != 2 or tsap[0] not in {1, 2, 3}:
         return None, None
     return tsap[1] >> 5, tsap[1] & 0x1F
-

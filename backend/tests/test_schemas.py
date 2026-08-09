@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.schemas import (
     Dnp3ObservationIn,
+    Iec61850ObservationIn,
     ModbusObservationIn,
     OpcUaObservationIn,
     S7ObservationIn,
@@ -110,3 +111,24 @@ def test_opcua_schema_accepts_browse_metadata() -> None:
         }
     )
     assert observation.service_name == "browse_request"
+
+
+def test_iec61850_schema_accepts_mms_metadata() -> None:
+    observation = Iec61850ObservationIn.model_validate(
+        {
+            "sensor_id": "sensor-1",
+            "observed_at": datetime.now(UTC),
+            "source_ip": "192.0.2.10",
+            "destination_ip": "192.0.2.20",
+            "source_port": 51000,
+            "destination_port": 102,
+            "cotp_type": "data",
+            "mms_pdu_type": "confirmed_request",
+            "invoke_id": 1,
+            "service_tag": 164,
+            "object_references": ["LD0/LLN0"],
+            "byte_count": 24,
+            "payload_sha256": "e" * 64,
+        }
+    )
+    assert observation.object_references == ["LD0/LLN0"]

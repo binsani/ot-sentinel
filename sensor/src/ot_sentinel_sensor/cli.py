@@ -19,6 +19,7 @@ from scapy.all import AsyncSniffer, PcapWriter  # type: ignore[import-untyped]
 
 from ot_sentinel_sensor.pcap import (
     dnp3_observations_from_pcap,
+    iec61850_observations_from_pcap,
     observations_from_pcap,
     opcua_observations_from_pcap,
     s7_observations_from_pcap,
@@ -31,6 +32,7 @@ GENERATORS = {
     "dnp3": dnp3_observations_from_pcap,
     "s7comm": s7_observations_from_pcap,
     "opcua": opcua_observations_from_pcap,
+    "iec61850": iec61850_observations_from_pcap,
 }
 
 
