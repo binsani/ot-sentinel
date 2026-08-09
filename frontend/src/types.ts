@@ -62,6 +62,27 @@ export type SiteSummary = {
   vulnerable_assets: number
 }
 
+export type AssetRisk = {
+  asset_id: string
+  site_id: string
+  ip_address: string
+  vendor: string | null
+  model: string | null
+  score: number
+  band: 'low' | 'medium' | 'high' | 'critical'
+  components: {
+    vulnerability: number
+    network_exposure: number
+    criticality: number
+  }
+  evidence: {
+    max_cvss: number | null
+    known_exploited: boolean
+    observed_peer_count: number
+    asset_criticality: number
+  }
+}
+
 export type AuditEntry = {
   id: number
   occurred_at: string
