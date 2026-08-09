@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /frontend
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
