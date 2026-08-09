@@ -108,7 +108,7 @@ services:
     command: ["python", "-m", "app.alert_worker", "--watch"]
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
-      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?Set WEBHOOK_SIGNING_SECRET in .env}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
     depends_on:
       db:
         condition: service_healthy
