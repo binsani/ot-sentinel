@@ -13,7 +13,7 @@ from app.probing import router as probing_router
 
 app = FastAPI(
     title=get_settings().app_name,
-    version="0.1.0",
+    version="0.2.0",
     description="Passive OT/ICS asset inventory and vulnerability correlation API.",
 )
 app.include_router(ingestion_router)
