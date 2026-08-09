@@ -1,6 +1,6 @@
 # Sensor
 
-The sensor passively observes Modbus TCP, DNP3/TCP, S7comm, and OPC UA metadata. It has two separate
+The sensor passively observes Modbus TCP, DNP3/TCP, S7comm, IEC 61850 MMS, and OPC UA metadata. It has two separate
 operating modes so capture hosts do not need direct access to the application network:
 
 - `capture` reads a TAP/SPAN interface and seals rotating PCAP files under `spool/incoming`.

@@ -6,6 +6,13 @@ from typing import Any
 from scapy.all import IP, TCP, Ether, IPv6, PcapReader, Raw  # type: ignore[import-untyped]
 
 from ot_sentinel_sensor.dnp3 import Dnp3ParseError, parse_dnp3_frame, split_dnp3_stream
+from ot_sentinel_sensor.iec61850 import (
+    Iec61850ParseError,
+    parse_iec61850_mms,
+)
+from ot_sentinel_sensor.iec61850 import (
+    split_tpkt_stream as split_mms_tpkt_stream,
+)
 from ot_sentinel_sensor.modbus import (
     ModbusParseError,
     parse_modbus_tcp,
@@ -268,5 +275,58 @@ def opcua_observations_from_pcap(
                     "service_name": message.service_name,
                     "fields": message.fields,
                     "byte_count": len(raw_message),
+                    "payload_sha256": message.payload_sha256,
+                }
+
+
+def iec61850_observations_from_pcap(
+    path: Path, *, sensor_id: str, site_id: str = "default"
+) -> Iterator[dict[str, Any]]:
+    """Read IEC 61850 MMS over RFC 1006 without active network interaction."""
+    streams: dict[tuple[str, int, str, int], tuple[int, bytes]] = {}
+    with PcapReader(str(path)) as packets:
+        for packet in packets:
+            if TCP not in packet or Raw not in packet:
+                continue
+            tcp = packet[TCP]
+            if tcp.sport != 102 and tcp.dport != 102:
+                continue
+            network = packet[IP] if IP in packet else packet[IPv6] if IPv6 in packet else None
+            if network is None:
+                continue
+            payload = bytes(packet[Raw])
+            flow = (network.src, tcp.sport, network.dst, tcp.dport)
+            sequence = int(tcp.seq)
+            previous_sequence, buffered = streams.get(flow, (sequence, b""))
+            if buffered and sequence != previous_sequence + len(buffered):
+                buffered = b""
+            try:
+                frames, remainder = split_mms_tpkt_stream(buffered + payload)
+            except Iec61850ParseError:
+                streams.pop(flow, None)
+                continue
+            streams[flow] = (sequence + len(payload) - len(remainder), remainder)
+            for raw_frame in frames:
+                try:
+                    message = parse_iec61850_mms(raw_frame)
+                except Iec61850ParseError:
+                    continue
+                yield {
+                    "sensor_id": sensor_id,
+                    "site_id": site_id,
+                    "observed_at": datetime.fromtimestamp(float(packet.time), UTC).isoformat(),
+                    "source_ip": network.src,
+                    "destination_ip": network.dst,
+                    "source_port": tcp.sport,
+                    "destination_port": tcp.dport,
+                    "source_mac": packet[Ether].src if Ether in packet else None,
+                    "destination_mac": packet[Ether].dst if Ether in packet else None,
+                    "cotp_type": message.cotp_type,
+                    "mms_pdu_type": message.mms_pdu_type,
+                    "invoke_id": message.invoke_id,
+                    "service_tag": message.service_tag,
+                    "object_references": message.object_references,
+                    "fields": message.fields,
+                    "byte_count": len(raw_frame),
                     "payload_sha256": message.payload_sha256,
                 }

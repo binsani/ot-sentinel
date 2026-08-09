@@ -162,3 +162,44 @@ class OpcUaObservationIn(BaseModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("observed_at must include a timezone")
         return value
+
+
+class Iec61850ObservationIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: UUID | None = None
+    sensor_id: str = Field(min_length=1, max_length=128)
+    site_id: str = Field(default="default", min_length=1, max_length=128)
+    observed_at: datetime
+    source_ip: IPv4Address | IPv6Address
+    destination_ip: IPv4Address | IPv6Address
+    source_port: int = Field(ge=0, le=65535)
+    destination_port: int = Field(ge=0, le=65535)
+    source_mac: str | None = Field(
+        default=None, pattern=r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+    )
+    destination_mac: str | None = Field(
+        default=None, pattern=r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+    )
+    cotp_type: str = Field(min_length=1, max_length=64)
+    mms_pdu_type: str = Field(min_length=1, max_length=64)
+    invoke_id: int | None = Field(default=None, ge=0)
+    service_tag: int | None = Field(default=None, ge=0, le=255)
+    object_references: list[str] = Field(default_factory=list, max_length=32)
+    fields: dict[str, Any] = Field(default_factory=dict)
+    byte_count: int = Field(ge=0)
+    payload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("object_references")
+    @classmethod
+    def validate_object_references(cls, values: list[str]) -> list[str]:
+        if any(not value or len(value) > 255 for value in values):
+            raise ValueError("object references must contain 1 to 255 characters")
+        return values
+
+    @field_validator("observed_at")
+    @classmethod
+    def iec61850_observed_at_must_have_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("observed_at must include a timezone")
+        return value

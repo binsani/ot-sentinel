@@ -12,6 +12,7 @@ from app.database import get_session
 from app.models import Asset, Observation, ProtocolEvent
 from app.schemas import (
     Dnp3ObservationIn,
+    Iec61850ObservationIn,
     IngestResult,
     ModbusObservationIn,
     OpcUaObservationIn,
@@ -165,6 +166,109 @@ def ingest_modbus(
         object_type="asset",
         object_id=str(asset.id),
         details={"sensor_id": data.sensor_id, "protocol": "modbus_tcp"},
+        actor_subject=f"sensor:{data.sensor_id}",
+    )
+    session.commit()
+    return IngestResult(
+        asset_id=str(asset.id),
+        observation_id=observation.id,
+        protocol_event_id=event.id,
+        created_asset=created_asset,
+    )
+
+
+@router.post(
+    "/iec61850",
+    response_model=IngestResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(authenticate_sensor)],
+)
+def ingest_iec61850(
+    data: Iec61850ObservationIn,
+    session: Session = Depends(get_session),
+) -> IngestResult:
+    if existing := existing_ingest_result(session, data.event_id):
+        return existing
+    server_is_source = data.source_port == 102
+    asset_ip = data.source_ip if server_is_source else data.destination_ip
+    asset_mac = data.source_mac if server_is_source else data.destination_mac
+    lock_key = f"{data.site_id}:{asset_ip}"
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {"lock_key": lock_key},
+    )
+    asset = session.scalar(
+        select(Asset)
+        .where(Asset.site_id == data.site_id, Asset.ip_address == str(asset_ip))
+        .with_for_update()
+    )
+    created_asset = asset is None
+    if asset is None:
+        asset = Asset(
+            site_id=data.site_id,
+            ip_address=str(asset_ip),
+            mac_address=asset_mac,
+            protocols=["iec61850_mms"],
+            fingerprint={},
+            first_seen=data.observed_at,
+            last_seen=data.observed_at,
+        )
+        session.add(asset)
+        session.flush()
+    else:
+        asset.first_seen = min(asset.first_seen, data.observed_at)
+        asset.last_seen = max(asset.last_seen, data.observed_at)
+        if "iec61850_mms" not in asset.protocols:
+            asset.protocols = [*asset.protocols, "iec61850_mms"]
+        if asset.mac_address is None and asset_mac is not None:
+            asset.mac_address = asset_mac
+    fingerprint = dict(asset.fingerprint)
+    pdu_types = set(fingerprint.get("iec61850_mms_pdu_types", []))
+    pdu_types.add(data.mms_pdu_type)
+    fingerprint["iec61850_mms_pdu_types"] = sorted(pdu_types)
+    references = set(fingerprint.get("iec61850_object_references", []))
+    references.update(data.object_references)
+    fingerprint["iec61850_object_references"] = sorted(references)[:256]
+    asset.fingerprint = fingerprint
+
+    observation = Observation(
+        sensor_event_id=data.event_id,
+        asset_id=asset.id,
+        sensor_id=data.sensor_id,
+        observed_at=data.observed_at,
+        source_ip=str(data.source_ip),
+        destination_ip=str(data.destination_ip),
+        source_port=data.source_port,
+        destination_port=data.destination_port,
+        protocol="iec61850_mms",
+        packet_count=1,
+        byte_count=data.byte_count,
+        metadata_={"cotp_type": data.cotp_type, "mms_pdu_type": data.mms_pdu_type},
+    )
+    session.add(observation)
+    session.flush()
+    event = ProtocolEvent(
+        asset_id=asset.id,
+        observation_id=observation.id,
+        protocol="iec61850_mms",
+        event_type=data.mms_pdu_type,
+        occurred_at=data.observed_at,
+        fields={
+            "invoke_id": data.invoke_id,
+            "service_tag": data.service_tag,
+            "object_references": data.object_references,
+            **data.fields,
+        },
+        payload_digest=bytes.fromhex(data.payload_sha256),
+    )
+    session.add(event)
+    session.flush()
+    append_audit_log(
+        session,
+        action="asset.discovered" if created_asset else "asset.observed",
+        object_type="asset",
+        object_id=str(asset.id),
+        details={"sensor_id": data.sensor_id, "protocol": "iec61850_mms"},
         actor_subject=f"sensor:{data.sensor_id}",
     )
     session.commit()

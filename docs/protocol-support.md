@@ -5,6 +5,7 @@
 | Modbus TCP | Offline-PCAP parser and authenticated ingestion implemented | Passive only |
 | DNP3 | Offline-PCAP link/transport/application metadata parser | Passive only |
 | S7comm | Offline RFC 1006/COTP/S7comm metadata parser | Passive only |
+| IEC 61850 MMS | Offline RFC 1006/COTP and BER MMS metadata parser | Passive only |
 | OPC UA metadata | UA-TCP handshake, channel, and cleartext service metadata | Passive only |
 
 Parser unit tests use deterministic protocol vectors. The Modbus and encrypted OPC UA metadata PCAP
@@ -26,6 +27,11 @@ link and transport evidence rather than being guessed.
 The S7comm parser validates TPKT lengths, COTP headers, and S7 parameter/data lengths. It records
 connection TSAPs, structurally valid rack/slot hints, negotiated PDU sizes, ROSCTR values, errors,
 and function classes. It does not decode variable payload values or support S7comm Plus (`0x72`).
+
+IEC 61850 MMS support validates TPKT/COTP framing and bounded BER lengths, records MMS PDU type,
+invoke ID, service tag, and visible object references. It does not decode process values or transmit
+association requests. Application payload inspection distinguishes MMS from S7comm on shared TCP
+port 102.
 
 OPC UA support records Hello/Acknowledge limits, endpoint URLs, security policy URIs, channel/token
 identifiers, and service IDs for complete messages explicitly associated with `SecurityPolicy#None`.
