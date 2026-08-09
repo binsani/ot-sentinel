@@ -74,7 +74,7 @@ def build_cyclonedx(assets: list[Asset], matches: list[CveMatch]) -> dict[str, A
                     {
                         "type": "application",
                         "name": "OT-Sentinel",
-                        "version": "0.1.0",
+                        "version": "0.2.0",
                     }
                 ]
             },
