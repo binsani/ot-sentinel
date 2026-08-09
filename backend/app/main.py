@@ -10,6 +10,7 @@ from app.exports import router as exports_router
 from app.ingestion import router as ingestion_router
 from app.inventory import router as inventory_router
 from app.probing import router as probing_router
+from app.risk import router as risk_router
 
 app = FastAPI(
     title=get_settings().app_name,
@@ -17,6 +18,7 @@ app = FastAPI(
     description="Passive OT/ICS asset inventory and vulnerability correlation API.",
 )
 app.include_router(ingestion_router)
+app.include_router(risk_router)
 app.include_router(inventory_router)
 app.include_router(exports_router)
 app.include_router(admin_router)

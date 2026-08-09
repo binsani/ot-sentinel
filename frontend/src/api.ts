@@ -1,4 +1,4 @@
-import type { Asset, AuditEntry, FeedStatus, GraphData, SiteSummary } from './types'
+import type { Asset, AssetRisk, AuditEntry, FeedStatus, GraphData, SiteSummary } from './types'
 
 async function request<T>(path: string, apiKey: string): Promise<T> {
   const response = await fetch(path, {
@@ -17,6 +17,7 @@ export const api = {
   asset: (key: string, id: string) => request<Asset>(`/api/v1/assets/${id}`, key),
   graph: (key: string) => request<GraphData>('/api/v1/assets/graph/communications', key),
   sites: (key: string) => request<SiteSummary[]>('/api/v1/assets/sites/summary', key),
+  risk: (key: string) => request<AssetRisk[]>('/api/v1/assets/risk/summary', key),
   feedStatus: (key: string) => request<FeedStatus>('/api/v1/admin/feeds/status', key),
   audit: (key: string) => request<AuditEntry[]>('/api/v1/admin/audit?limit=100', key),
   setFirmwareBaseline: (key: string, id: string) =>

@@ -1,13 +1,13 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from './api'
-import type { Asset, AuditEntry, FeedStatus, GraphData, SiteSummary } from './types'
+import type { Asset, AssetRisk, AuditEntry, FeedStatus, GraphData, SiteSummary } from './types'
 
 const NetworkGraph = lazy(() =>
   import('./NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
 )
 
-type View = 'inventory' | 'sites' | 'graph' | 'administration'
+type View = 'inventory' | 'risk' | 'sites' | 'graph' | 'administration'
 
 export default function App() {
   const [apiKey, setApiKey] = useState('')
@@ -15,6 +15,7 @@ export default function App() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] })
   const [sites, setSites] = useState<SiteSummary[]>([])
+  const [risks, setRisks] = useState<AssetRisk[]>([])
   const [selected, setSelected] = useState<Asset | null>(null)
   const [view, setView] = useState<View>('inventory')
   const [query, setQuery] = useState('')
@@ -29,10 +30,11 @@ export default function App() {
     setLoading(true)
     setError('')
     try {
-      const [assetRows, graphData, siteRows] = await Promise.all([api.assets(key), api.graph(key), api.sites(key)])
+      const [assetRows, graphData, siteRows, riskRows] = await Promise.all([api.assets(key), api.graph(key), api.sites(key), api.risk(key)])
       setAssets(assetRows)
       setGraph(graphData)
       setSites(siteRows)
+      setRisks(riskRows)
       setInventoryAsOf(Date.now())
       try {
         const [feeds, audit] = await Promise.all([api.feedStatus(key), api.audit(key)])
@@ -146,6 +148,7 @@ export default function App() {
 
         <nav className="mb-4 flex gap-1 border-b border-slate-800" aria-label="Dashboard views">
           <Tab active={view === 'inventory'} onClick={() => setView('inventory')}>Asset inventory</Tab>
+          <Tab active={view === 'risk'} onClick={() => setView('risk')}>Risk</Tab>
           <Tab active={view === 'sites'} onClick={() => setView('sites')}>Sites</Tab>
           <Tab active={view === 'graph'} onClick={() => setView('graph')}>Communication graph</Tab>
           {auditEvents && <Tab active={view === 'administration'} onClick={() => setView('administration')}>Administration</Tab>}
@@ -159,6 +162,8 @@ export default function App() {
             </div>
             <AssetTable assets={visibleAssets} selectAsset={selectAsset} />
           </section>
+        ) : view === 'risk' ? (
+          <RiskPanel risks={risks} openAsset={(assetId) => { const asset = assets.find((item) => item.id === assetId); if (asset) void selectAsset(asset) }} />
         ) : view === 'sites' ? (
           <SitesPanel sites={sites} openSite={(siteId) => { setSiteFilter(siteId); setView('inventory') }} />
         ) : view === 'graph' ? (
@@ -197,6 +202,11 @@ function AssetTable({ assets, selectAsset }: { assets: Asset[]; selectAsset: (as
 function SitesPanel({ sites, openSite }: { sites: SiteSummary[]; openSite: (siteId: string) => void }) {
   if (sites.length === 0) return <section className="panel p-10 text-center text-sm text-slate-500">No sites are reporting inventory.</section>
   return <section className="panel overflow-hidden"><div className="border-b border-slate-800 p-4"><h2 className="font-medium">Site overview</h2><p className="mt-1 text-xs text-slate-500">Aggregated operational exposure across reporting locations.</p></div><div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{sites.map((site) => <article key={site.site_id} className="rounded-md border border-slate-800 bg-slate-900/40 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-mono font-semibold text-emerald-300">{site.site_id}</h3><p className="mt-1 text-xs text-slate-500">Last seen {formatTime(site.last_seen)}</p></div><button className="button-secondary" onClick={() => openSite(site.site_id)}>Open inventory</button></div><dl className="mt-4 grid grid-cols-2 gap-3"><Fact label="Assets" value={String(site.asset_count)} /><Fact label="Vulnerable assets" value={String(site.vulnerable_assets)} /><Fact label="CVE matches" value={String(site.vulnerability_matches)} /><Fact label="Firmware drift" value={String(site.firmware_drift_count)} /></dl></article>)}</div></section>
+}
+
+function RiskPanel({ risks, openAsset }: { risks: AssetRisk[]; openAsset: (assetId: string) => void }) {
+  if (risks.length === 0) return <section className="panel p-10 text-center text-sm text-slate-500">No asset risk evidence is available.</section>
+  return <section className="panel overflow-hidden"><div className="border-b border-slate-800 p-4"><h2 className="font-medium">Explainable asset risk</h2><p className="mt-1 text-xs text-slate-500">50% vulnerability, 25% observed peers, 25% assigned criticality. Scores prioritize review; they do not replace engineering judgment.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Asset</th><th className="px-4 py-3">Score</th><th className="px-4 py-3">Vulnerability</th><th className="px-4 py-3">Exposure</th><th className="px-4 py-3">Criticality</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3"><span className="sr-only">Review</span></th></tr></thead><tbody className="divide-y divide-slate-800">{risks.map((risk) => <tr key={risk.asset_id} className="hover:bg-slate-900/70"><td className="px-4 py-3"><span className="font-mono text-emerald-300">{risk.ip_address}</span><span className="mt-1 block text-xs text-slate-500">{risk.site_id} · {[risk.vendor, risk.model].filter(Boolean).join(' ') || 'Unidentified'}</span></td><td className="px-4 py-3"><span className={risk.band === 'critical' || risk.band === 'high' ? 'badge-danger' : 'badge'}>{risk.score} · {risk.band}</span></td><td className="px-4 py-3 font-mono">{risk.components.vulnerability}</td><td className="px-4 py-3 font-mono">{risk.components.network_exposure}</td><td className="px-4 py-3 font-mono">{risk.components.criticality}</td><td className="px-4 py-3 text-xs text-slate-500">CVSS {risk.evidence.max_cvss ?? '—'} · {risk.evidence.observed_peer_count} peers{risk.evidence.known_exploited ? ' · KEV' : ''}</td><td className="px-4 py-3"><button className="text-emerald-300 hover:text-emerald-200" onClick={() => openAsset(risk.asset_id)}>Review</button></td></tr>)}</tbody></table></div></section>
 }
 
 function AssetDrawer({ asset, close, canAdmin, baselineFirmware }: { asset: Asset; close: () => void; canAdmin: boolean; baselineFirmware: (asset: Asset) => Promise<void> }) {

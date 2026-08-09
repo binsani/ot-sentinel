@@ -17,6 +17,7 @@ This mapping is implementation guidance, not a certification claim. Control appl
 | Passive DNP3 discovery | CRC-validated offline parser and outstation-address fingerprinting | Supports passive RTU/IED identification and communication evidence without polling field devices |
 | Passive S7comm discovery | RFC 1006/COTP/S7 metadata and rack/slot evidence | Supports passive PLC identification and observed control-operation evidence without contacting PLCs |
 | Passive IEC 61850 MMS discovery | RFC 1006/COTP/MMS metadata and visible object-reference evidence | Supports passive IED identification and substation communication evidence without association requests |
+| Explainable asset risk scoring | Weighted CVSS/KEV, observed peer exposure, and operator criticality with raw evidence | Supports documented, repeatable vulnerability prioritization and risk-treatment decisions |
 | Passive OPC UA discovery | endpoint, security-policy, channel, and cleartext service metadata | Supports passive server/session/browse evidence without decrypting or manipulating OPC UA traffic |
 | Store-and-forward evidence handling | sealed incoming PCAPs, replay-safe event IDs, retained archive | Supports controlled-zone transfer, evidence continuity, and repeatable collection in disconnected sites |
 | Firmware configuration monitoring | administrator-approved baseline, passive version comparison, timestamped drift transitions | Supports authorized-change review, configuration monitoring, and patch-management evidence |
