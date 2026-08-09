@@ -82,6 +82,12 @@ OPC UA TCP support records handshake limits, endpoint URLs, security policies, s
 identifiers, and recognizable session/browse service IDs when `SecurityPolicy#None` is explicitly
 observed. Protected message bodies remain opaque and are never decrypted.
 
+## Phase 2 progress
+
+Firmware drift monitoring is implemented. Administrators can establish a baseline from an observed
+version, while later passive Modbus device-identification responses detect and audit divergence or
+restoration. No firmware query is transmitted to field devices.
+
 ## Trademark notice
 
 Modbus, DNP3, OPC UA, Siemens, and S7 are trademarks or names of their respective owners. OT-Sentinel is independent and is not affiliated with or endorsed by those owners.

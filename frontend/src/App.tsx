@@ -82,6 +82,16 @@ export default function App() {
     }
   }
 
+  async function baselineFirmware(asset: Asset) {
+    try {
+      await api.setFirmwareBaseline(apiKey, asset.id)
+      setSelected(await api.asset(apiKey, asset.id))
+      await refresh(apiKey)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to set firmware baseline.')
+    }
+  }
+
   const visibleAssets = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
     if (!needle) return assets
@@ -95,6 +105,7 @@ export default function App() {
   const staleCount = assets.filter(
     (asset) => inventoryAsOf - new Date(asset.last_seen).getTime() > 24 * 60 * 60 * 1000,
   ).length
+  const driftCount = assets.filter((asset) => asset.firmware_drift).length
 
   if (!apiKey) {
     return <AccessGate draftKey={draftKey} setDraftKey={setDraftKey} connect={connect} error={error} />
@@ -123,10 +134,11 @@ export default function App() {
 
       <main className="mx-auto max-w-[1600px] px-5 py-6">
         {error && <div role="alert" className="mb-5 rounded-md border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
-        <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Inventory summary">
+        <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Inventory summary">
           <Metric label="Observed assets" value={assets.length} detail="Across all configured sites" />
           <Metric label="Communication pairs" value={graph.edges.length} detail="Protocol-specific flows" />
           <Metric label="Stale assets" value={staleCount} detail="Not observed in 24 hours" warning={staleCount > 0} />
+          <Metric label="Firmware drift" value={driftCount} detail="Observed version differs from baseline" warning={driftCount > 0} />
           <Metric label="Sites" value={new Set(assets.map((asset) => asset.site_id)).size} detail="Reporting inventory" />
         </section>
 
@@ -156,7 +168,7 @@ export default function App() {
           <AdministrationPanel feeds={feedStatus} events={auditEvents ?? []} />
         )}
       </main>
-      {selected && <AssetDrawer asset={selected} close={() => setSelected(null)} />}
+      {selected && <AssetDrawer asset={selected} close={() => setSelected(null)} canAdmin={auditEvents !== null} baselineFirmware={baselineFirmware} />}
     </div>
   )
 }
@@ -178,7 +190,7 @@ function AssetTable({ assets, selectAsset }: { assets: Asset[]; selectAsset: (as
   return <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Address</th><th className="px-4 py-3">Identity</th><th className="px-4 py-3">Protocols</th><th className="px-4 py-3">Site</th><th className="px-4 py-3">Last seen</th><th className="px-4 py-3"><span className="sr-only">Open</span></th></tr></thead><tbody className="divide-y divide-slate-800">{assets.map((asset) => <tr key={asset.id} className="hover:bg-slate-900/70"><td className="px-4 py-3 font-mono text-emerald-300">{asset.ip_address}<span className="mt-1 block text-xs text-slate-600">{asset.mac_address ?? 'MAC unknown'}</span></td><td className="px-4 py-3">{[asset.vendor, asset.model].filter(Boolean).join(' ') || asset.hostname || 'Unidentified device'}<span className="mt-1 block text-xs text-slate-500">{asset.firmware_version ? `Firmware ${asset.firmware_version}` : 'Firmware unknown'}</span></td><td className="px-4 py-3"><div className="flex flex-wrap gap-1">{asset.protocols.map((protocol) => <span key={protocol} className="badge">{protocol}</span>)}</div></td><td className="px-4 py-3 text-slate-400">{asset.site_id}</td><td className="px-4 py-3 text-slate-400">{formatTime(asset.last_seen)}</td><td className="px-4 py-3"><button className="text-emerald-300 hover:text-emerald-200" onClick={() => void selectAsset(asset)}>Review</button></td></tr>)}</tbody></table></div>
 }
 
-function AssetDrawer({ asset, close }: { asset: Asset; close: () => void }) {
+function AssetDrawer({ asset, close, canAdmin, baselineFirmware }: { asset: Asset; close: () => void; canAdmin: boolean; baselineFirmware: (asset: Asset) => Promise<void> }) {
   const vulnerabilities = asset.vulnerabilities ?? []
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -187,7 +199,7 @@ function AssetDrawer({ asset, close }: { asset: Asset; close: () => void }) {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [close])
-  return <div className="fixed inset-0 z-20 flex justify-end bg-black/60" role="dialog" aria-modal="true" aria-label={`Asset ${asset.ip_address}`} onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><aside className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-700 bg-slate-950 shadow-2xl"><div className="sticky top-0 flex items-start justify-between border-b border-slate-800 bg-slate-950/95 p-5 backdrop-blur"><div><p className="font-mono text-lg text-emerald-300">{asset.ip_address}</p><p className="mt-1 text-sm text-slate-400">{[asset.vendor, asset.model].filter(Boolean).join(' ') || 'Unidentified OT asset'}</p></div><button onClick={close} className="button-secondary" aria-label="Close asset details">Close</button></div><div className="space-y-6 p-5"><section><h3 className="section-title">Asset evidence</h3><dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><Fact label="Site" value={asset.site_id} /><Fact label="Firmware" value={asset.firmware_version ?? 'Unknown'} /><Fact label="First seen" value={formatTime(asset.first_seen)} /><Fact label="Last seen" value={formatTime(asset.last_seen)} /></dl></section><section><h3 className="section-title">Vulnerability matches <span className="ml-2 text-slate-500">{vulnerabilities.length}</span></h3><div className="mt-3 space-y-3">{vulnerabilities.length === 0 ? <p className="rounded-md border border-slate-800 p-4 text-sm text-slate-500">No CVE matches are currently associated with this fingerprint.</p> : vulnerabilities.map((item) => <article key={item.cve_id} className="rounded-md border border-slate-800 bg-slate-900/50 p-4"><div className="flex items-center justify-between gap-3"><span className="font-mono text-sm font-semibold text-slate-100">{item.cve_id}</span><span className={item.known_exploited ? 'badge-danger' : 'badge'}>{item.known_exploited ? 'Known exploited' : item.severity ?? 'Unscored'}</span></div><p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">{item.advisory.description || 'No English description available.'}</p><div className="mt-3 flex gap-4 text-xs text-slate-500"><span>CVSS {item.cvss_score ?? '—'}</span><span>{item.status}</span><span>{Math.round(item.confidence * 100)}% confidence</span></div></article>)}</div></section></div></aside></div>
+  return <div className="fixed inset-0 z-20 flex justify-end bg-black/60" role="dialog" aria-modal="true" aria-label={`Asset ${asset.ip_address}`} onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><aside className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-700 bg-slate-950 shadow-2xl"><div className="sticky top-0 flex items-start justify-between border-b border-slate-800 bg-slate-950/95 p-5 backdrop-blur"><div><p className="font-mono text-lg text-emerald-300">{asset.ip_address}</p><p className="mt-1 text-sm text-slate-400">{[asset.vendor, asset.model].filter(Boolean).join(' ') || 'Unidentified OT asset'}</p></div><button onClick={close} className="button-secondary" aria-label="Close asset details">Close</button></div><div className="space-y-6 p-5"><section><div className="flex items-center justify-between gap-3"><h3 className="section-title">Asset evidence</h3>{asset.firmware_drift && <span className="badge-danger">Firmware drift</span>}</div><dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><Fact label="Site" value={asset.site_id} /><Fact label="Firmware" value={asset.firmware_version ?? 'Unknown'} /><Fact label="Baseline" value={asset.firmware_baseline ?? 'Not set'} /><Fact label="First seen" value={formatTime(asset.first_seen)} /><Fact label="Last seen" value={formatTime(asset.last_seen)} /></dl>{canAdmin && asset.firmware_version && <button className="button-secondary mt-3" onClick={() => void baselineFirmware(asset)}>Set current firmware as baseline</button>}</section><section><h3 className="section-title">Vulnerability matches <span className="ml-2 text-slate-500">{vulnerabilities.length}</span></h3><div className="mt-3 space-y-3">{vulnerabilities.length === 0 ? <p className="rounded-md border border-slate-800 p-4 text-sm text-slate-500">No CVE matches are currently associated with this fingerprint.</p> : vulnerabilities.map((item) => <article key={item.cve_id} className="rounded-md border border-slate-800 bg-slate-900/50 p-4"><div className="flex items-center justify-between gap-3"><span className="font-mono text-sm font-semibold text-slate-100">{item.cve_id}</span><span className={item.known_exploited ? 'badge-danger' : 'badge'}>{item.known_exploited ? 'Known exploited' : item.severity ?? 'Unscored'}</span></div><p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">{item.advisory.description || 'No English description available.'}</p><div className="mt-3 flex gap-4 text-xs text-slate-500"><span>CVSS {item.cvss_score ?? '—'}</span><span>{item.status}</span><span>{Math.round(item.confidence * 100)}% confidence</span></div></article>)}</div></section></div></aside></div>
 }
 
 function AdministrationPanel({ feeds, events }: { feeds: FeedStatus | null; events: AuditEntry[] }) {

@@ -18,6 +18,11 @@ export type Asset = {
   vendor: string | null
   model: string | null
   firmware_version: string | null
+  firmware_baseline: string | null
+  firmware_baseline_set_at: string | null
+  firmware_baseline_set_by: string | null
+  firmware_drift_detected_at: string | null
+  firmware_drift: boolean
   protocols: string[]
   fingerprint: Record<string, unknown>
   criticality: number
