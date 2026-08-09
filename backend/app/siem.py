@@ -161,6 +161,8 @@ def enqueue_siem_event(
 
 
 def event_severity(event_type: str, payload: dict[str, Any]) -> Severity:
+    if event_type == "communication_anomaly":
+        return "high"
     if event_type == "vulnerability_match":
         value = str(payload.get("severity") or "medium").casefold()
         if payload.get("known_exploited"):

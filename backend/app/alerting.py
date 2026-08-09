@@ -21,7 +21,7 @@ from app.models import AlertDelivery, AlertRule
 from app.siem import enqueue_siem_event, event_severity
 
 router = APIRouter(prefix="/api/v1/admin/alerts", tags=["alerting"])
-EventType = Literal["firmware_drift", "vulnerability_match"]
+EventType = Literal["firmware_drift", "vulnerability_match", "communication_anomaly"]
 
 
 class AlertRuleCreate(BaseModel):

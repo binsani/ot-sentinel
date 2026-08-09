@@ -1,13 +1,13 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from './api'
-import type { Asset, AssetRisk, AuditEntry, FeedStatus, GraphData, SiteSummary } from './types'
+import type { Asset, AssetRisk, AuditEntry, FeedStatus, GraphAnomaly, GraphData, SiteSummary } from './types'
 
 const NetworkGraph = lazy(() =>
   import('./NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
 )
 
-type View = 'inventory' | 'risk' | 'sites' | 'graph' | 'administration'
+type View = 'inventory' | 'risk' | 'anomalies' | 'sites' | 'graph' | 'administration'
 
 export default function App() {
   const [apiKey, setApiKey] = useState('')
@@ -16,6 +16,7 @@ export default function App() {
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] })
   const [sites, setSites] = useState<SiteSummary[]>([])
   const [risks, setRisks] = useState<AssetRisk[]>([])
+  const [anomalies, setAnomalies] = useState<GraphAnomaly[]>([])
   const [selected, setSelected] = useState<Asset | null>(null)
   const [view, setView] = useState<View>('inventory')
   const [query, setQuery] = useState('')
@@ -30,11 +31,12 @@ export default function App() {
     setLoading(true)
     setError('')
     try {
-      const [assetRows, graphData, siteRows, riskRows] = await Promise.all([api.assets(key), api.graph(key), api.sites(key), api.risk(key)])
+      const [assetRows, graphData, siteRows, riskRows, anomalyRows] = await Promise.all([api.assets(key), api.graph(key), api.sites(key), api.risk(key), api.anomalies(key)])
       setAssets(assetRows)
       setGraph(graphData)
       setSites(siteRows)
       setRisks(riskRows)
+      setAnomalies(anomalyRows)
       setInventoryAsOf(Date.now())
       try {
         const [feeds, audit] = await Promise.all([api.feedStatus(key), api.audit(key)])
@@ -97,6 +99,15 @@ export default function App() {
     }
   }
 
+  async function acknowledgeAnomaly(id: string) {
+    try {
+      await api.acknowledgeAnomaly(apiKey, id)
+      await refresh(apiKey)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to acknowledge anomaly.')
+    }
+  }
+
   const visibleAssets = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
     return assets.filter((asset) =>
@@ -149,6 +160,7 @@ export default function App() {
         <nav className="mb-4 flex gap-1 border-b border-slate-800" aria-label="Dashboard views">
           <Tab active={view === 'inventory'} onClick={() => setView('inventory')}>Asset inventory</Tab>
           <Tab active={view === 'risk'} onClick={() => setView('risk')}>Risk</Tab>
+          <Tab active={view === 'anomalies'} onClick={() => setView('anomalies')}>Anomalies</Tab>
           <Tab active={view === 'sites'} onClick={() => setView('sites')}>Sites</Tab>
           <Tab active={view === 'graph'} onClick={() => setView('graph')}>Communication graph</Tab>
           {auditEvents && <Tab active={view === 'administration'} onClick={() => setView('administration')}>Administration</Tab>}
@@ -164,6 +176,8 @@ export default function App() {
           </section>
         ) : view === 'risk' ? (
           <RiskPanel risks={risks} openAsset={(assetId) => { const asset = assets.find((item) => item.id === assetId); if (asset) void selectAsset(asset) }} />
+        ) : view === 'anomalies' ? (
+          <AnomalyPanel anomalies={anomalies} canAdmin={auditEvents !== null} acknowledge={acknowledgeAnomaly} />
         ) : view === 'sites' ? (
           <SitesPanel sites={sites} openSite={(siteId) => { setSiteFilter(siteId); setView('inventory') }} />
         ) : view === 'graph' ? (
@@ -207,6 +221,11 @@ function SitesPanel({ sites, openSite }: { sites: SiteSummary[]; openSite: (site
 function RiskPanel({ risks, openAsset }: { risks: AssetRisk[]; openAsset: (assetId: string) => void }) {
   if (risks.length === 0) return <section className="panel p-10 text-center text-sm text-slate-500">No asset risk evidence is available.</section>
   return <section className="panel overflow-hidden"><div className="border-b border-slate-800 p-4"><h2 className="font-medium">Explainable asset risk</h2><p className="mt-1 text-xs text-slate-500">50% vulnerability, 25% observed peers, 25% assigned criticality. Scores prioritize review; they do not replace engineering judgment.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Asset</th><th className="px-4 py-3">Score</th><th className="px-4 py-3">Vulnerability</th><th className="px-4 py-3">Exposure</th><th className="px-4 py-3">Criticality</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3"><span className="sr-only">Review</span></th></tr></thead><tbody className="divide-y divide-slate-800">{risks.map((risk) => <tr key={risk.asset_id} className="hover:bg-slate-900/70"><td className="px-4 py-3"><span className="font-mono text-emerald-300">{risk.ip_address}</span><span className="mt-1 block text-xs text-slate-500">{risk.site_id} · {[risk.vendor, risk.model].filter(Boolean).join(' ') || 'Unidentified'}</span></td><td className="px-4 py-3"><span className={risk.band === 'critical' || risk.band === 'high' ? 'badge-danger' : 'badge'}>{risk.score} · {risk.band}</span></td><td className="px-4 py-3 font-mono">{risk.components.vulnerability}</td><td className="px-4 py-3 font-mono">{risk.components.network_exposure}</td><td className="px-4 py-3 font-mono">{risk.components.criticality}</td><td className="px-4 py-3 text-xs text-slate-500">CVSS {risk.evidence.max_cvss ?? '—'} · {risk.evidence.observed_peer_count} peers{risk.evidence.known_exploited ? ' · KEV' : ''}</td><td className="px-4 py-3"><button className="text-emerald-300 hover:text-emerald-200" onClick={() => openAsset(risk.asset_id)}>Review</button></td></tr>)}</tbody></table></div></section>
+}
+
+function AnomalyPanel({ anomalies, canAdmin, acknowledge }: { anomalies: GraphAnomaly[]; canAdmin: boolean; acknowledge: (id: string) => Promise<void> }) {
+  if (anomalies.length === 0) return <section className="panel p-10 text-center text-sm text-slate-500">No new communication edges are open against active baselines.</section>
+  return <section className="panel overflow-hidden"><div className="border-b border-slate-800 p-4"><h2 className="font-medium">Communication anomalies</h2><p className="mt-1 text-xs text-slate-500">New source, destination, and protocol combinations observed after an administrator-approved site baseline.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Site</th><th className="px-4 py-3">New communication</th><th className="px-4 py-3">Protocol</th><th className="px-4 py-3">First seen</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3"><span className="sr-only">Action</span></th></tr></thead><tbody className="divide-y divide-slate-800">{anomalies.map((item) => <tr key={item.id}><td className="px-4 py-3 text-slate-400">{item.site_id}</td><td className="px-4 py-3 font-mono"><span className="text-emerald-300">{item.source_ip}</span><span className="mx-2 text-slate-600">→</span><span className="text-emerald-300">{item.destination_ip}</span></td><td className="px-4 py-3"><span className="badge-danger">{item.protocol}</span></td><td className="px-4 py-3 text-slate-400">{formatTime(item.first_seen)}</td><td className="px-4 py-3 text-slate-400">{item.observation_count} observations</td><td className="px-4 py-3">{canAdmin && <button className="text-emerald-300 hover:text-emerald-200" onClick={() => void acknowledge(item.id)}>Acknowledge</button>}</td></tr>)}</tbody></table></div></section>
 }
 
 function AssetDrawer({ asset, close, canAdmin, baselineFirmware }: { asset: Asset; close: () => void; canAdmin: boolean; baselineFirmware: (asset: Asset) => Promise<void> }) {

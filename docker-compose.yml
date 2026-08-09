@@ -134,6 +134,22 @@ services:
     tmpfs:
       - /tmp
 
+  anomaly-worker:
+    profiles: ["anomalies"]
+    build: ./backend
+    command: ["python", "-m", "app.anomaly_worker", "--watch"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
+      SIEM_ALLOWED_CIDRS: ${SIEM_ALLOWED_CIDRS:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
 volumes:
   postgres_data:
   sensor_spool:

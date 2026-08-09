@@ -5,6 +5,7 @@ from starlette.responses import Response
 
 from app.admin import router as admin_router
 from app.alerting import router as alerting_router
+from app.anomalies import router as anomaly_router
 from app.config import get_settings
 from app.exports import router as exports_router
 from app.ingestion import router as ingestion_router
@@ -19,6 +20,7 @@ app = FastAPI(
     description="Passive OT/ICS asset inventory and vulnerability correlation API.",
 )
 app.include_router(ingestion_router)
+app.include_router(anomaly_router)
 app.include_router(risk_router)
 app.include_router(inventory_router)
 app.include_router(exports_router)

@@ -83,6 +83,21 @@ export type AssetRisk = {
   }
 }
 
+export type GraphAnomaly = {
+  id: string
+  baseline_id: string
+  site_id: string
+  source_ip: string
+  destination_ip: string
+  protocol: string
+  status: 'open' | 'acknowledged'
+  first_seen: string
+  last_seen: string
+  observation_count: number
+  acknowledged_at: string | null
+  acknowledged_by: string | null
+}
+
 export type AuditEntry = {
   id: number
   occurred_at: string

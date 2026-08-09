@@ -248,7 +248,7 @@ class AlertRule(Base):
     __tablename__ = "alert_rules"
     __table_args__ = (
         CheckConstraint(
-            "event_type IN ('firmware_drift', 'vulnerability_match')",
+            "event_type IN ('firmware_drift', 'vulnerability_match', 'communication_anomaly')",
             name="ck_alert_rules_event_type",
         ),
     )
@@ -382,3 +382,60 @@ class SiemDelivery(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class GraphBaseline(Base):
+    __tablename__ = "graph_baselines"
+    __table_args__ = (Index("ix_graph_baseline_active_site", "site_id", "active"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    site_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    captured_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    edge_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class GraphBaselineEdge(Base):
+    __tablename__ = "graph_baseline_edges"
+    __table_args__ = (
+        UniqueConstraint(
+            "baseline_id", "source_ip", "destination_ip", "protocol", name="uq_baseline_edge"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    baseline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("graph_baselines.id", ondelete="CASCADE"), nullable=False
+    )
+    source_ip: Mapped[Any] = mapped_column(INET, nullable=False)
+    destination_ip: Mapped[Any] = mapped_column(INET, nullable=False)
+    protocol: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class GraphAnomaly(Base):
+    __tablename__ = "graph_anomalies"
+    __table_args__ = (
+        UniqueConstraint(
+            "baseline_id", "source_ip", "destination_ip", "protocol", name="uq_graph_anomaly"
+        ),
+        CheckConstraint(
+            "status IN ('open', 'acknowledged')", name="ck_graph_anomaly_status"
+        ),
+        Index("ix_graph_anomaly_status", "status", "last_seen"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    baseline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("graph_baselines.id", ondelete="CASCADE"), nullable=False
+    )
+    site_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_ip: Mapped[Any] = mapped_column(INET, nullable=False)
+    destination_ip: Mapped[Any] = mapped_column(INET, nullable=False)
+    protocol: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="open", nullable=False)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    observation_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    acknowledged_by: Mapped[str | None] = mapped_column(String(255))
