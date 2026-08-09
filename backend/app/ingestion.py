@@ -123,7 +123,13 @@ def ingest_modbus(
         if isinstance(model, str) and model:
             asset.model = model[:255]
         if isinstance(revision, str) and revision:
-            asset.firmware_version = revision[:255]
+            _apply_firmware_version(
+                session,
+                asset,
+                revision[:255],
+                data.observed_at,
+                data.sensor_id,
+            )
 
     observation = Observation(
         sensor_event_id=data.event_id,
@@ -167,6 +173,47 @@ def ingest_modbus(
         protocol_event_id=event.id,
         created_asset=created_asset,
     )
+
+
+def _apply_firmware_version(
+    session: Session,
+    asset: Asset,
+    version: str,
+    observed_at: Any,
+    sensor_id: str,
+) -> None:
+    previous = asset.firmware_version
+    was_drifted = asset.firmware_drift_detected_at is not None
+    asset.firmware_version = version
+    is_drifted = bool(asset.firmware_baseline and version != asset.firmware_baseline)
+    if is_drifted and not was_drifted:
+        asset.firmware_drift_detected_at = observed_at
+        append_audit_log(
+            session,
+            action="firmware.drift_detected",
+            object_type="asset",
+            object_id=str(asset.id),
+            details={
+                "baseline": asset.firmware_baseline,
+                "previous": previous,
+                "observed": version,
+            },
+            actor_subject=f"sensor:{sensor_id}",
+        )
+    elif not is_drifted and was_drifted:
+        asset.firmware_drift_detected_at = None
+        append_audit_log(
+            session,
+            action="firmware.drift_resolved",
+            object_type="asset",
+            object_id=str(asset.id),
+            details={
+                "baseline": asset.firmware_baseline,
+                "previous": previous,
+                "observed": version,
+            },
+            actor_subject=f"sensor:{sensor_id}",
+        )
 
 
 @router.post(

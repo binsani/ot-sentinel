@@ -18,3 +18,4 @@ This mapping is implementation guidance, not a certification claim. Control appl
 | Passive S7comm discovery | RFC 1006/COTP/S7 metadata and rack/slot evidence | Supports passive PLC identification and observed control-operation evidence without contacting PLCs |
 | Passive OPC UA discovery | endpoint, security-policy, channel, and cleartext service metadata | Supports passive server/session/browse evidence without decrypting or manipulating OPC UA traffic |
 | Store-and-forward evidence handling | sealed incoming PCAPs, replay-safe event IDs, retained archive | Supports controlled-zone transfer, evidence continuity, and repeatable collection in disconnected sites |
+| Firmware configuration monitoring | administrator-approved baseline, passive version comparison, timestamped drift transitions | Supports authorized-change review, configuration monitoring, and patch-management evidence |

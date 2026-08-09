@@ -86,4 +86,5 @@ def append_audit_log(
         ),
     )
     session.add(entry)
+    session.flush()
     return entry

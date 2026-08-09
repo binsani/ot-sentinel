@@ -18,9 +18,24 @@ export const api = {
   graph: (key: string) => request<GraphData>('/api/v1/assets/graph/communications', key),
   feedStatus: (key: string) => request<FeedStatus>('/api/v1/admin/feeds/status', key),
   audit: (key: string) => request<AuditEntry[]>('/api/v1/admin/audit?limit=100', key),
+  setFirmwareBaseline: (key: string, id: string) =>
+    requestWithBody<{ firmware_drift: boolean }>(
+      `/api/v1/admin/assets/${id}/firmware-baseline`, key, 'PUT', { version: null },
+    ),
   exportCsv: (key: string) => download('/api/v1/exports/assets.csv', key, 'ot-sentinel-assets.csv'),
   exportCycloneDx: (key: string) =>
     download('/api/v1/exports/cyclonedx', key, 'ot-sentinel.cdx.json'),
+}
+
+async function requestWithBody<T>(path: string, apiKey: string, method: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!response.ok) throw new Error(`Request failed (${response.status})`)
+  return response.json() as Promise<T>
 }
 
 async function download(path: string, apiKey: string, filename: string) {

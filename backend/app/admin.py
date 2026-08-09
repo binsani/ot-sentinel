@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.audit import append_audit_log, verify_audit_chain
 from app.auth import Principal, require_admin
 from app.database import get_session
-from app.models import AuditLog, User, UserRole
+from app.models import Asset, AuditLog, User, UserRole
 
 router = APIRouter(prefix="/api/v1/admin", tags=["administration"])
 
@@ -23,6 +24,79 @@ class UserUpdate(BaseModel):
         if self.role is None and self.is_active is None:
             raise ValueError("at least one user property must be supplied")
         return self
+
+
+class FirmwareBaselineUpdate(BaseModel):
+    version: str | None = None
+
+
+@router.put("/assets/{asset_id}/firmware-baseline")
+def set_firmware_baseline(
+    asset_id: uuid.UUID,
+    update: FirmwareBaselineUpdate,
+    principal: Principal = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    asset = session.scalar(select(Asset).where(Asset.id == asset_id).with_for_update())
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="asset not found")
+    version = (update.version or asset.firmware_version or "").strip()
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="no observed firmware is available to baseline",
+        )
+    if len(version) > 255:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="version too long"
+        )
+    previous = asset.firmware_baseline
+    asset.firmware_baseline = version
+    asset.firmware_baseline_set_at = datetime.now(UTC)
+    asset.firmware_baseline_set_by = principal.subject
+    drifted = bool(asset.firmware_version and asset.firmware_version != version)
+    asset.firmware_drift_detected_at = datetime.now(UTC) if drifted else None
+    append_audit_log(
+        session,
+        action="firmware.baseline_set",
+        object_type="asset",
+        object_id=str(asset.id),
+        details={"previous": previous, "current": version, "drift": drifted},
+        actor_subject=principal.subject,
+    )
+    session.commit()
+    return {
+        "asset_id": str(asset.id),
+        "firmware_version": asset.firmware_version,
+        "firmware_baseline": asset.firmware_baseline,
+        "firmware_drift": drifted,
+        "firmware_drift_detected_at": asset.firmware_drift_detected_at,
+    }
+
+
+@router.delete("/assets/{asset_id}/firmware-baseline", status_code=status.HTTP_204_NO_CONTENT)
+def clear_firmware_baseline(
+    asset_id: uuid.UUID,
+    principal: Principal = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> None:
+    asset = session.scalar(select(Asset).where(Asset.id == asset_id).with_for_update())
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="asset not found")
+    previous = asset.firmware_baseline
+    asset.firmware_baseline = None
+    asset.firmware_baseline_set_at = None
+    asset.firmware_baseline_set_by = None
+    asset.firmware_drift_detected_at = None
+    append_audit_log(
+        session,
+        action="firmware.baseline_cleared",
+        object_type="asset",
+        object_id=str(asset.id),
+        details={"previous": previous},
+        actor_subject=principal.subject,
+    )
+    session.commit()
 
 
 @router.get("/audit")

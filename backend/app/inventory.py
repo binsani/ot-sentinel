@@ -159,6 +159,15 @@ def _asset_dict(asset: Asset) -> dict[str, Any]:
         "vendor": asset.vendor,
         "model": asset.model,
         "firmware_version": asset.firmware_version,
+        "firmware_baseline": asset.firmware_baseline,
+        "firmware_baseline_set_at": asset.firmware_baseline_set_at,
+        "firmware_baseline_set_by": asset.firmware_baseline_set_by,
+        "firmware_drift_detected_at": asset.firmware_drift_detected_at,
+        "firmware_drift": bool(
+            asset.firmware_baseline
+            and asset.firmware_version
+            and asset.firmware_baseline != asset.firmware_version
+        ),
         "protocols": asset.protocols,
         "fingerprint": asset.fingerprint,
         "criticality": asset.criticality,
