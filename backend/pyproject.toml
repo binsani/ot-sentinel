@@ -35,6 +35,9 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["B008"]
 
+[tool.ruff.lint.isort]
+known-third-party = ["alembic", "sqlalchemy"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
