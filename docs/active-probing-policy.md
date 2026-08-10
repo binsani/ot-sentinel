@@ -15,3 +15,8 @@ A future executor must satisfy every independent gate before any transmission:
 The evaluation endpoint records an immutable audit event and always returns
 `transmission_performed: false` and `probe_executor_not_installed`. Disabling a policy clears its
 approval immediately.
+
+The current safety decision is **no-go** for an executor in v1.0. The independent evidence and
+release separation required to reconsider that decision are defined in
+[`probe-executor-safety-review.md`](probe-executor-safety-review.md). CI and release builds enforce
+the passive-product invariants automatically.

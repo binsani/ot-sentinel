@@ -25,6 +25,7 @@ The API container applies database migrations before starting. PostgreSQL is onl
 - Database-enforced append-only audit records with full-chain verification
 - Air-gapped feed worker, container orchestration, CI, CodeQL, and dependency update policy
 - Fail-closed active-probing policy evaluation with probing disabled and no executor shipped
+- CI-enforced passive-release gate with a documented no-go decision for a v1.0 probe executor
 
 ## Passive sensor
 
