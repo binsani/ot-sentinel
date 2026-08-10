@@ -32,3 +32,7 @@ kubectl -n ot-sentinel rollout status deployment/ot-sentinel-workers
 Run the migration Job once per release before rolling application workloads. Back up PostgreSQL and
 perform a restore rehearsal before every schema upgrade. Capture remains on a dedicated TAP/SPAN host;
 only authenticated parsed observations cross into the cluster.
+
+For regional resilience, use the fenced primary/dormant-standby profiles and promotion procedure in
+[`multi-region-disaster-recovery.md`](multi-region-disaster-recovery.md). OT-Sentinel does not
+support unfenced active-active application writers.
