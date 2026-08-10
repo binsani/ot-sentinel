@@ -1,6 +1,6 @@
 # OT-Sentinel
 
-OT-Sentinel is an open-source, passive-by-default OT/ICS asset discovery and vulnerability-correlation platform. Version 0.2.0 includes passive capture and protocol metadata parsing, authenticated inventory ingestion, PostgreSQL persistence, offline vulnerability correlation, multi-site visibility, firmware drift, secure alerting, a web dashboard, compliance exports, role management, and a verifiable append-only audit chain.
+OT-Sentinel is an open-source, passive-by-default OT/ICS asset discovery and vulnerability-correlation platform. Version 0.3.0 includes passive discovery, multi-site inventory, vulnerability and firmware evidence, explainable risk scoring, communication anomaly detection, secure webhook and TLS Syslog integrations, compliance exports, and a verifiable append-only audit chain.
 
 > **Safety:** OT-Sentinel observes mirrored network traffic. It must not transmit to field devices. Active probing is outside the current scope and must never be enabled implicitly.
 

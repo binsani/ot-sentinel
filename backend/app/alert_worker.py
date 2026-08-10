@@ -51,7 +51,7 @@ def process_pending(session: Session, limit: int = 25) -> int:
                 method="POST",
                 headers={
                     "Content-Type": "application/json",
-                    "User-Agent": "OT-Sentinel/0.2",
+                    "User-Agent": "OT-Sentinel/0.3",
                     "X-OT-Sentinel-Delivery": str(delivery.id),
                     "X-OT-Sentinel-Signature-256": webhook_signature(
                         secret_value.get_secret_value(), body
