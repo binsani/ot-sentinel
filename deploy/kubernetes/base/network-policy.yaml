@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-ingress
+  namespace: ot-sentinel
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ot-sentinel-backend
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ot-sentinel-frontend
+      ports:
+        - {protocol: TCP, port: 8000}

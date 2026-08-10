@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ot-sentinel-workers
+  namespace: ot-sentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ot-sentinel-workers
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ot-sentinel-workers
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: alert-worker
+          image: ghcr.io/binsani/ot-sentinel-backend:v0.3.0
+          command: ["python", "-m", "app.alert_worker", "--watch"]
+          envFrom: &worker-env
+            - configMapRef: {name: ot-sentinel-config}
+            - secretRef: {name: ot-sentinel-secrets}
+          securityContext: &worker-security
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            readOnlyRootFilesystem: true
+          resources: &worker-resources
+            requests: {cpu: 25m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+        - name: siem-worker
+          image: ghcr.io/binsani/ot-sentinel-backend:v0.3.0
+          command: ["python", "-m", "app.siem_worker", "--watch"]
+          envFrom: *worker-env
+          securityContext: *worker-security
+          resources: *worker-resources
+        - name: anomaly-worker
+          image: ghcr.io/binsani/ot-sentinel-backend:v0.3.0
+          command: ["python", "-m", "app.anomaly_worker", "--watch"]
+          envFrom: *worker-env
+          securityContext: *worker-security
+          resources: *worker-resources
