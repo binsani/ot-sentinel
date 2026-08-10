@@ -1,0 +1,76 @@
+name: Performance validation
+on:
+  workflow_dispatch:
+    inputs:
+      asset_count:
+        description: Synthetic asset count
+        required: true
+        default: "10000"
+      duration_seconds:
+        description: Load duration in seconds
+        required: true
+        default: "60"
+permissions:
+  contents: read
+jobs:
+  api-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ot_sentinel_performance
+          POSTGRES_USER: ot_sentinel
+          POSTGRES_PASSWORD: performance-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ot_sentinel -d ot_sentinel_performance"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ot_sentinel:performance-only-password@localhost:5432/ot_sentinel_performance
+      BOOTSTRAP_API_KEYS_ENABLED: "true"
+      VIEWER_API_KEY: performance-viewer-key-for-ci-only
+      ADMIN_API_KEY: performance-admin-key-for-ci-only
+      OT_SENTINEL_LOAD_API_KEY: performance-viewer-key-for-ci-only
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install uv==0.12.3
+      - working-directory: backend
+        run: uv sync --frozen
+      - working-directory: backend
+        run: uv run alembic upgrade head
+      - working-directory: backend
+        run: >-
+          uv run python ../scripts/seed-performance-data.py
+          --assets ${{ inputs.asset_count }}
+          --observations-per-asset 4
+          --confirmation "SEED DISPOSABLE PERFORMANCE DATABASE"
+      - name: Start API
+        working-directory: backend
+        run: |
+          uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8000/health && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Run bounded load
+        working-directory: backend
+        run: >-
+          uv run python ../scripts/load-test.py
+          --duration ${{ inputs.duration_seconds }}
+          --concurrency 16
+          --p95-budget-ms 3000
+          --max-error-rate 0.005
+          --output ../performance-results.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: performance-results
+          path: performance-results.json
+          if-no-files-found: warn
