@@ -14,3 +14,17 @@ upstream license before redistributing any downloaded fixture.
 `opcua-encrypted.pcapng` comes from the Wireshark Foundation test-capture collection at a pinned
 commit under GPL-2.0. OT-Sentinel reads only the unencrypted UA-TCP handshake and channel metadata;
 encrypted application bodies remain opaque.
+
+`dnp3_example.pcap` comes from CISA's official ICSNPP-DNP3 parser test suite under BSD-3-Clause.
+It exercises bidirectional DNP3 read, select, operate, response, confirm, and unsolicited-response
+traffic. OT-Sentinel validates DNP3 link CRCs before exposing application metadata.
+
+`cisa_snap7.pcap` and `cisa_s7ident.pcap` come from CISA's official ICSNPP-S7comm parser test suite
+under BSD-3-Clause. They exercise classic S7comm connection negotiation, rack/slot hints, variable
+reads and writes, upload flow, PLC stop observation, and response metadata. S7comm Plus traffic is
+outside OT-Sentinel's declared parser scope and is not represented as supported by these fixtures.
+
+The fetcher validates every manifest entry before network access. Filenames must be unique and
+local, hashes must be complete SHA-256 values, and both capture and license URLs must contain the
+same immutable 40-character upstream commit. A source repository and written provenance statement
+are mandatory. Downloaded third-party files remain excluded from source control.

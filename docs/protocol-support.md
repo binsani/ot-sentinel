@@ -8,16 +8,17 @@
 | IEC 61850 MMS | Offline RFC 1006/COTP and BER MMS metadata parser | Passive only |
 | OPC UA metadata | UA-TCP handshake, channel, and cleartext service metadata | Passive only |
 
-Parser unit tests use deterministic protocol vectors. The Modbus and encrypted OPC UA metadata PCAP
-pipelines additionally run against third-party captures fetched from GPL-licensed upstream
-repositories at pinned commits and verified by SHA-256. External binaries are not bundled with the
-Apache-licensed project; provenance and retrieval details live in `sensor/tests/external`. Suitable
-redistributable DNP3 and S7comm fixtures are still accepted when their provenance and license can be
-verified; their deterministic framing and parser tests remain mandatory in CI.
+Parser unit tests use deterministic protocol vectors. The Modbus, DNP3, S7comm, and encrypted OPC UA
+metadata pipelines additionally run against third-party captures fetched from upstream repositories
+at pinned commits and verified by SHA-256. The DNP3 fixture is from CISA's BSD-3-Clause ICSNPP test
+suite; the S7comm fixtures are from CISA's corresponding BSD-3-Clause suite; the remaining fixtures
+are GPL-licensed. External binaries are not bundled with the Apache-licensed project; provenance and
+retrieval details live in `sensor/tests/external`. Deterministic framing tests remain mandatory in
+CI alongside the independently sourced capture corpus.
 
 The Modbus implementation parses existing captures and does not expose active capture or probing.
-Real deployment captures still require a scrubbed, redistributable regression corpus before the
-parser can be considered production-validated.
+Real deployment captures still require site-specific acceptance using scrubbed evidence when the
+operator is permitted to retain it; public fixtures cannot represent every vendor implementation.
 
 The DNP3 parser verifies link-header and 16-byte user-block CRCs, extracts link addresses, and reads
 transport/application metadata from first transport segments. Multi-frame application-fragment
