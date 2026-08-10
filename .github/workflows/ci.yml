@@ -41,6 +41,24 @@ jobs:
       - run: uv run mypy app
       - run: uv run alembic upgrade head
       - run: uv run pytest
+      - name: Backup and isolated restore rehearsal
+        shell: pwsh
+        env:
+          PGPASSWORD: ci-postgres-password
+        run: |
+          $backupDirectory = Join-Path $env:RUNNER_TEMP 'ot-sentinel-backup'
+          $manifestPath = (& ../scripts/backup-postgres.ps1 `
+            -DatabaseUrl $env:DATABASE_URL `
+            -OutputDirectory $backupDirectory | Select-Object -Last 1)
+          & createdb --host localhost --username ot_sentinel ot_sentinel_restore
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to create isolated restore database.' }
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          $dumpPath = Join-Path $backupDirectory $manifest.dump_file
+          & ../scripts/restore-postgres.ps1 `
+            -DatabaseUrl 'postgresql://ot_sentinel:ci-postgres-password@localhost:5432/ot_sentinel_restore' `
+            -BackupFile $dumpPath `
+            -ManifestFile $manifestPath `
+            -Confirmation 'RESTORE INTO VERIFIED EMPTY DATABASE'
   sensor:
     runs-on: ubuntu-latest
     defaults:
@@ -86,3 +104,7 @@ jobs:
       - run: docker compose --profile sensor --profile feeds config --quiet
       - run: docker compose --profile sensor --profile feeds build
       - run: kubectl kustomize deploy/kubernetes/base > /dev/null
+      - shell: pwsh
+        run: |
+          $null = [scriptblock]::Create((Get-Content scripts/backup-postgres.ps1 -Raw))
+          $null = [scriptblock]::Create((Get-Content scripts/restore-postgres.ps1 -Raw))
