@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ot-sentinel-config
+  namespace: ot-sentinel
+data:
+  BOOTSTRAP_API_KEYS_ENABLED: "false"
+  ACTIVE_PROBING_ENABLED: "false"
+  OIDC_ISSUER: "https://identity.example.com"
+  OIDC_AUDIENCE: "ot-sentinel"
+  OIDC_JWKS_URL: "https://identity.example.com/.well-known/jwks.json"
+  SIEM_ALLOWED_CIDRS: ""
