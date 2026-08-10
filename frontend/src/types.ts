@@ -98,6 +98,67 @@ export type GraphAnomaly = {
   acknowledged_by: string | null
 }
 
+export type AlertRule = {
+  id: string
+  name: string
+  event_type: 'firmware_drift' | 'vulnerability_match' | 'communication_anomaly'
+  site_id: string | null
+  webhook_url: string
+  enabled: boolean
+  created_by: string
+  created_at: string
+}
+
+export type SiemDestination = {
+  id: string
+  name: string
+  host: string
+  port: number
+  transport: 'tcp_tls'
+  minimum_severity: 'info' | 'low' | 'medium' | 'high' | 'critical'
+  enabled: boolean
+  created_by: string
+  created_at: string
+}
+
+export type ProbePolicy = {
+  id: string
+  name: string
+  site_id: string
+  enabled: boolean
+  allowed_cidrs: string[]
+  protocols: Array<'icmp_echo' | 'tcp_connect'>
+  max_targets: number
+  rate_per_minute: number
+  maintenance_start_hour: number
+  maintenance_end_hour: number
+  approved_by: string | null
+  approval_expires_at: string | null
+}
+
+export type ProbeStatus = {
+  global_enabled: boolean
+  executor_available: false
+  transmission_capable: false
+  policies: ProbePolicy[]
+}
+
+export type GraphBaseline = {
+  id: string
+  site_id: string
+  active: boolean
+  captured_at: string
+  captured_by: string
+  edge_count: number
+}
+
+export type AdminControls = {
+  alertRules: AlertRule[]
+  siemDestinations: SiemDestination[]
+  probeStatus: ProbeStatus
+  baselines: GraphBaseline[]
+}
+
 export type AuditEntry = {
   id: number
   occurred_at: string
