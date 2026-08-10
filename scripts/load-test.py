@@ -108,7 +108,11 @@ def main() -> None:
     if args.output:
         with open(args.output, "w", encoding="utf-8") as output_file:
             output_file.write(rendered + "\n")
-    if report["error_rate"] > args.max_error_rate or report["latency_ms"]["p95"] > args.p95_budget_ms:
+    budget_exceeded = (
+        report["error_rate"] > args.max_error_rate
+        or report["latency_ms"]["p95"] > args.p95_budget_ms
+    )
+    if budget_exceeded:
         raise SystemExit("performance budget exceeded")
 
 

@@ -44,6 +44,12 @@ def chunks(total: int, size: int):
         yield range(start, min(start + size, total))
 
 
+def synthetic_seen_times(index: int, now: datetime) -> tuple[datetime, datetime]:
+    last_seen = now - timedelta(seconds=index % 3_600)
+    first_seen = last_seen - timedelta(days=1 + index % 90)
+    return first_seen, last_seen
+
+
 def main() -> None:
     args = parse_args()
     validate_args(args)
@@ -55,7 +61,9 @@ def main() -> None:
             cursor.execute("SELECT current_database()")
             name = cursor.fetchone()[0]
             if not name.endswith(("_performance", "_perf")):
-                raise SystemExit("refusing to seed: database name must end in _performance or _perf")
+                raise SystemExit(
+                    "refusing to seed: database name must end in _performance or _perf"
+                )
             cursor.execute("SELECT count(*) FROM assets")
             if cursor.fetchone()[0]:
                 raise SystemExit("refusing to seed: assets table is not empty")
@@ -65,6 +73,7 @@ def main() -> None:
                 for index in batch:
                     asset_id = uuid.uuid5(namespace, f"asset-{index}")
                     ip = f"10.{(index // 65_536) % 256}.{(index // 256) % 256}.{index % 256}"
+                    first_seen, last_seen = synthetic_seen_times(index, now)
                     rows.append(
                         (
                             asset_id,
@@ -77,8 +86,8 @@ def main() -> None:
                             Jsonb(["modbus" if index % 2 == 0 else "opcua"]),
                             Jsonb({"synthetic": True, "dataset": "performance-v1"}),
                             1 + index % 5,
-                            now - timedelta(days=index % 90),
-                            now - timedelta(seconds=index % 3600),
+                            first_seen,
+                            last_seen,
                         )
                     )
                 cursor.executemany(
@@ -95,12 +104,16 @@ def main() -> None:
                 for index in batch:
                     asset_index = index // args.observations_per_asset
                     peer = (asset_index * 17 + index) % max(args.assets, 1)
+                    source_ip = (
+                        f"10.{(asset_index // 65_536) % 256}."
+                        f"{(asset_index // 256) % 256}.{asset_index % 256}"
+                    )
                     rows.append(
                         (
                             uuid.uuid5(namespace, f"asset-{asset_index}"),
                             f"performance-sensor-{asset_index % args.sites:04d}",
                             now - timedelta(seconds=index % 86_400),
-                            f"10.{(asset_index // 65_536) % 256}.{(asset_index // 256) % 256}.{asset_index % 256}",
+                            source_ip,
                             f"172.20.{(peer // 256) % 256}.{peer % 256}",
                             40_000 + index % 20_000,
                             502 if asset_index % 2 == 0 else 4840,
