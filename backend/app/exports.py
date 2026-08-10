@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from app.audit import append_audit_log
 from app.auth import Principal, require_viewer
 from app.database import get_session
-from app.models import Asset, CveMatch, MatchStatus
+from app.models import Asset, CveMatch, GraphAnomaly, MatchStatus
+from app.risk import calculate_asset_risks
 
 router = APIRouter(
     prefix="/api/v1/exports",
@@ -29,7 +30,9 @@ def export_cyclonedx(
 ) -> Response:
     assets = _assets(session, site_id)
     matches = _matches(session, [asset.id for asset in assets])
-    document = build_cyclonedx(assets, matches)
+    risks = calculate_asset_risks(session, assets)
+    anomaly_counts = _anomaly_counts(session, assets)
+    document = build_cyclonedx(assets, matches, risks, anomaly_counts)
     _audit_export(session, "cyclonedx", site_id, len(assets), principal.subject)
     return Response(
         content=json.dumps(document, separators=(",", ":")),
@@ -45,7 +48,9 @@ def export_assets_csv(
     session: Session = Depends(get_session),
 ) -> Response:
     assets = _assets(session, site_id)
-    content = build_asset_csv(assets)
+    risks = calculate_asset_risks(session, assets)
+    anomaly_counts = _anomaly_counts(session, assets)
+    content = build_asset_csv(assets, risks, anomaly_counts)
     _audit_export(session, "asset-csv", site_id, len(assets), principal.subject)
     return Response(
         content=content,
@@ -54,9 +59,18 @@ def export_assets_csv(
     )
 
 
-def build_cyclonedx(assets: list[Asset], matches: list[CveMatch]) -> dict[str, Any]:
+def build_cyclonedx(
+    assets: list[Asset],
+    matches: list[CveMatch],
+    risks: dict[Any, dict[str, Any]] | None = None,
+    anomaly_counts: dict[Any, int] | None = None,
+) -> dict[str, Any]:
     generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-    components = [_component(asset) for asset in assets]
+    risks = risks or {}
+    anomaly_counts = anomaly_counts or {}
+    components = [
+        _component(asset, risks.get(asset.id), anomaly_counts.get(asset.id, 0)) for asset in assets
+    ]
     grouped: dict[str, list[CveMatch]] = defaultdict(list)
     for match in matches:
         grouped[match.cve_id].append(match)
@@ -88,7 +102,13 @@ def build_cyclonedx(assets: list[Asset], matches: list[CveMatch]) -> dict[str, A
     }
 
 
-def build_asset_csv(assets: list[Asset]) -> str:
+def build_asset_csv(
+    assets: list[Asset],
+    risks: dict[Any, dict[str, Any]] | None = None,
+    anomaly_counts: dict[Any, int] | None = None,
+) -> str:
+    risks = risks or {}
+    anomaly_counts = anomaly_counts or {}
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow(
@@ -103,11 +123,19 @@ def build_asset_csv(assets: list[Asset]) -> str:
             "firmware_version",
             "protocols",
             "criticality",
+            "risk_score",
+            "risk_band",
+            "risk_vulnerability_component",
+            "risk_network_exposure_component",
+            "risk_criticality_component",
+            "open_communication_anomalies",
             "first_seen",
             "last_seen",
         ]
     )
     for asset in assets:
+        risk = risks.get(asset.id, {})
+        components = risk.get("components", {})
         writer.writerow(
             [
                 str(asset.id),
@@ -120,6 +148,12 @@ def build_asset_csv(assets: list[Asset]) -> str:
                 _csv_safe(asset.firmware_version or ""),
                 ";".join(asset.protocols),
                 asset.criticality,
+                risk.get("score", ""),
+                risk.get("band", ""),
+                components.get("vulnerability", ""),
+                components.get("network_exposure", ""),
+                components.get("criticality", ""),
+                anomaly_counts.get(asset.id, 0),
                 asset.first_seen.isoformat(),
                 asset.last_seen.isoformat(),
             ]
@@ -127,7 +161,9 @@ def build_asset_csv(assets: list[Asset]) -> str:
     return output.getvalue()
 
 
-def _component(asset: Asset) -> dict[str, Any]:
+def _component(
+    asset: Asset, risk: dict[str, Any] | None = None, anomaly_count: int = 0
+) -> dict[str, Any]:
     component: dict[str, Any] = {
         "type": "device",
         "bom-ref": f"urn:uuid:{asset.id}",
@@ -139,8 +175,20 @@ def _component(asset: Asset) -> dict[str, Any]:
             {"name": "ot-sentinel:protocols", "value": ",".join(asset.protocols)},
             {"name": "ot-sentinel:first-seen", "value": asset.first_seen.isoformat()},
             {"name": "ot-sentinel:last-seen", "value": asset.last_seen.isoformat()},
+            {"name": "ot-sentinel:open-communication-anomalies", "value": str(anomaly_count)},
         ],
     }
+    if risk:
+        component["properties"].extend(
+            [
+                {"name": "ot-sentinel:risk-score", "value": str(risk["score"])},
+                {"name": "ot-sentinel:risk-band", "value": str(risk["band"])},
+                {
+                    "name": "ot-sentinel:risk-components",
+                    "value": json.dumps(risk["components"], sort_keys=True, separators=(",", ":")),
+                },
+            ]
+        )
     if asset.vendor:
         component["manufacturer"] = {"name": asset.vendor}
     if asset.firmware_version:
@@ -171,10 +219,7 @@ def _vulnerability(cve_id: str, matches: list[CveMatch]) -> dict[str, Any]:
             "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
         },
         "analysis": {"state": state, "detail": detail},
-        "affects": [
-            {"ref": f"urn:uuid:{match.asset_id}"}
-            for match in matches
-        ],
+        "affects": [{"ref": f"urn:uuid:{match.asset_id}"} for match in matches],
     }
     if representative.cvss_score is not None:
         result["ratings"] = [
@@ -204,6 +249,25 @@ def _matches(session: Session, asset_ids: list[uuid.UUID]) -> list[CveMatch]:
     if not asset_ids:
         return []
     return list(session.scalars(select(CveMatch).where(CveMatch.asset_id.in_(asset_ids))))
+
+
+def _anomaly_counts(session: Session, assets: list[Asset]) -> dict[Any, int]:
+    if not assets:
+        return {}
+    sites = {asset.site_id for asset in assets}
+    anomalies = session.scalars(
+        select(GraphAnomaly).where(GraphAnomaly.site_id.in_(sites), GraphAnomaly.status == "open")
+    )
+    counts: dict[Any, int] = defaultdict(int)
+    by_site_ip = {(asset.site_id, str(asset.ip_address)): asset.id for asset in assets}
+    for anomaly in anomalies:
+        involved = {
+            by_site_ip.get((anomaly.site_id, str(anomaly.source_ip))),
+            by_site_ip.get((anomaly.site_id, str(anomaly.destination_ip))),
+        }
+        for asset_id in involved - {None}:
+            counts[asset_id] += 1
+    return counts
 
 
 def _audit_export(

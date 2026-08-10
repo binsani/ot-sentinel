@@ -13,3 +13,5 @@ assessment.
 Bands are low below 25, medium from 25, high from 50, and critical from 75. API and dashboard
 responses include every component and the underlying CVSS, KEV, peer-count, and criticality evidence.
 Inventory and evidence changes are reflected on the next calculation; no hidden model state exists.
+CSV and CycloneDX exports carry the same score, band, component breakdown, and open communication
+anomaly count used by the dashboard.
