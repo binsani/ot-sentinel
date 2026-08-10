@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+commonLabels:
+  ot-sentinel.openai.com/deployment-role: dormant-standby
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Job
+      name: ot-sentinel-migrate
+    patch: |-
+      - op: add
+        path: /spec/suspend
+        value: true
+  - target:
+      kind: Ingress
+      name: ot-sentinel
+    patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: ot-sentinel

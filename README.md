@@ -104,3 +104,5 @@ Operational guidance is available in [`docs/architecture.md`](docs/architecture.
 by [`docs/performance-testing.md`](docs/performance-testing.md). Site commissioning must follow
 [`docs/field-acceptance.md`](docs/field-acceptance.md), while independent review preparation is in
 [`docs/security-assessment-readiness.md`](docs/security-assessment-readiness.md).
+Multi-region standby and fenced recovery operations are documented in
+[`docs/multi-region-disaster-recovery.md`](docs/multi-region-disaster-recovery.md).

@@ -108,6 +108,14 @@ jobs:
       - run: docker compose --profile sensor --profile feeds config --quiet
       - run: docker compose --profile sensor --profile feeds build
       - run: kubectl kustomize deploy/kubernetes/base > /dev/null
+      - run: kubectl kustomize deploy/kubernetes/overlays/primary > /dev/null
+      - name: Validate dormant regional standby
+        run: |
+          kubectl kustomize deploy/kubernetes/overlays/standby > "$RUNNER_TEMP/standby.yaml"
+          test "$(grep -c 'replicas: 0' "$RUNNER_TEMP/standby.yaml")" -eq 3
+          grep -q 'suspend: true' "$RUNNER_TEMP/standby.yaml"
+          ! grep -q 'kind: Ingress' "$RUNNER_TEMP/standby.yaml"
+      - run: kubectl kustomize deploy/kubernetes/overlays/recovery > /dev/null
       - shell: pwsh
         run: |
           $null = [scriptblock]::Create((Get-Content scripts/backup-postgres.ps1 -Raw))
