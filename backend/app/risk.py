@@ -59,9 +59,25 @@ def risk_summary(
     if site_id:
         asset_statement = asset_statement.where(Asset.site_id == site_id)
     assets = list(session.scalars(asset_statement))
+    risks = calculate_asset_risks(session, assets)
+    result = [risks[asset.id] for asset in assets]
+    result.sort(key=lambda item: (-item["score"], item["site_id"], item["ip_address"]))
+    append_audit_log(
+        session,
+        action="asset_risk.viewed",
+        object_type="risk_summary",
+        object_id=None,
+        details={"site_id": site_id, "count": len(result)},
+        actor_subject=principal.subject,
+    )
+    session.commit()
+    return result
+
+
+def calculate_asset_risks(session: Session, assets: list[Asset]) -> dict[Any, dict[str, Any]]:
     asset_ids = [asset.id for asset in assets]
     if not asset_ids:
-        return []
+        return {}
     vulnerability_rows = session.execute(
         select(
             CveMatch.asset_id,
@@ -89,7 +105,7 @@ def risk_summary(
         .group_by(Observation.asset_id)
     ).all()
     peers_by_asset = {row.asset_id: int(row.peer_count) for row in peer_rows}
-    result = []
+    result: dict[Any, dict[str, Any]] = {}
     for asset in assets:
         max_cvss, known_exploited = vulnerability_by_asset.get(asset.id, (None, False))
         risk = calculate_risk(
@@ -100,24 +116,12 @@ def risk_summary(
                 peer_count=peers_by_asset.get(asset.id, 0),
             )
         )
-        result.append(
-            {
-                "asset_id": str(asset.id),
-                "site_id": asset.site_id,
-                "ip_address": str(asset.ip_address),
-                "vendor": asset.vendor,
-                "model": asset.model,
-                **risk,
-            }
-        )
-    result.sort(key=lambda item: (-item["score"], item["site_id"], item["ip_address"]))
-    append_audit_log(
-        session,
-        action="asset_risk.viewed",
-        object_type="risk_summary",
-        object_id=None,
-        details={"site_id": site_id, "count": len(result)},
-        actor_subject=principal.subject,
-    )
-    session.commit()
+        result[asset.id] = {
+            "asset_id": str(asset.id),
+            "site_id": asset.site_id,
+            "ip_address": str(asset.ip_address),
+            "vendor": asset.vendor,
+            "model": asset.model,
+            **risk,
+        }
     return result
