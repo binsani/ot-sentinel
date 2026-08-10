@@ -108,3 +108,10 @@ jobs:
         run: |
           $null = [scriptblock]::Create((Get-Content scripts/backup-postgres.ps1 -Raw))
           $null = [scriptblock]::Create((Get-Content scripts/restore-postgres.ps1 -Raw))
+          $null = [scriptblock]::Create((Get-Content scripts/collect-audit-evidence.ps1 -Raw))
+          $evidenceDirectory = Join-Path $env:RUNNER_TEMP 'audit-evidence-rehearsal'
+          $manifestPath = & scripts/collect-audit-evidence.ps1 -OutputDirectory $evidenceDirectory
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          if ($manifest.schema -ne 'ot-sentinel-audit-evidence/v1') { throw 'Unexpected evidence schema.' }
+          if ($manifest.worktree_dirty) { throw 'CI evidence collection reported a dirty worktree.' }
+          if ($manifest.files.Count -lt 10) { throw 'Audit evidence manifest is incomplete.' }
