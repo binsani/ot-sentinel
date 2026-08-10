@@ -101,4 +101,5 @@ Operational guidance is available in [`docs/architecture.md`](docs/architecture.
 [`docs/threat-model.md`](docs/threat-model.md), and
 [`docs/backup-restore.md`](docs/backup-restore.md). Repeatable large-inventory validation is covered
 by [`docs/performance-testing.md`](docs/performance-testing.md). Site commissioning must follow
-[`docs/field-acceptance.md`](docs/field-acceptance.md).
+[`docs/field-acceptance.md`](docs/field-acceptance.md), while independent review preparation is in
+[`docs/security-assessment-readiness.md`](docs/security-assessment-readiness.md).

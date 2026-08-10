@@ -41,4 +41,5 @@ site change record. Never connect an unapproved interface to a production contro
    sensitive packet contents.
 
 Field acceptance passes only when every check is evidenced and signed off by the OT asset owner and
-the site's cybersecurity authority.
+the site's cybersecurity authority. Use [`field-acceptance-record.md`](field-acceptance-record.md)
+for the controlled evidence record and retain the completed copy outside the public repository.
