@@ -1,4 +1,4 @@
-import type { Asset, AssetRisk, AuditEntry, FeedStatus, GraphAnomaly, GraphData, SiteSummary } from './types'
+import type { AdminControls, AlertRule, Asset, AssetRisk, AuditEntry, FeedStatus, GraphAnomaly, GraphBaseline, GraphData, ProbePolicy, ProbeStatus, SiemDestination, SiteSummary } from './types'
 
 async function request<T>(path: string, apiKey: string): Promise<T> {
   const response = await fetch(path, {
@@ -23,6 +23,23 @@ export const api = {
     requestWithBody<GraphAnomaly>(`/api/v1/anomalies/${id}/acknowledge`, key, 'POST', {}),
   feedStatus: (key: string) => request<FeedStatus>('/api/v1/admin/feeds/status', key),
   audit: (key: string) => request<AuditEntry[]>('/api/v1/admin/audit?limit=100', key),
+  adminControls: async (key: string): Promise<AdminControls> => {
+    const [alertRules, siemDestinations, probeStatus, baselines] = await Promise.all([
+      request<AlertRule[]>('/api/v1/admin/alerts/rules', key),
+      request<SiemDestination[]>('/api/v1/admin/siem/destinations', key),
+      request<ProbeStatus>('/api/v1/admin/probing/status', key),
+      request<GraphBaseline[]>('/api/v1/anomalies/baselines', key),
+    ])
+    return { alertRules, siemDestinations, probeStatus, baselines }
+  },
+  createAlertRule: (key: string, body: { name: string; event_type: string; site_id: string | null; webhook_url: string }) => requestWithBody<AlertRule>('/api/v1/admin/alerts/rules', key, 'POST', body),
+  deleteAlertRule: (key: string, id: string) => requestNoContent(`/api/v1/admin/alerts/rules/${id}`, key, 'DELETE'),
+  createSiemDestination: (key: string, body: { name: string; host: string; port: number; minimum_severity: string }) => requestWithBody<SiemDestination>('/api/v1/admin/siem/destinations', key, 'POST', body),
+  setSiemEnabled: (key: string, id: string, enabled: boolean) => requestWithBody<SiemDestination>(`/api/v1/admin/siem/destinations/${id}/${enabled ? 'enable' : 'disable'}`, key, 'POST', {}),
+  captureBaseline: (key: string, site_id: string, confirmation: string) => requestWithBody<GraphBaseline>('/api/v1/anomalies/baselines', key, 'POST', { site_id, confirmation }),
+  createProbePolicy: (key: string, body: Record<string, unknown>) => requestWithBody<ProbePolicy>('/api/v1/admin/probing/policies', key, 'POST', body),
+  approveProbePolicy: (key: string, id: string, confirmation: string, approval_hours: number) => requestWithBody<ProbePolicy>(`/api/v1/admin/probing/policies/${id}/approve`, key, 'POST', { confirmation, approval_hours }),
+  disableProbePolicy: (key: string, id: string) => requestWithBody<ProbePolicy>(`/api/v1/admin/probing/policies/${id}/disable`, key, 'POST', {}),
   setFirmwareBaseline: (key: string, id: string) =>
     requestWithBody<{ firmware_drift: boolean }>(
       `/api/v1/admin/assets/${id}/firmware-baseline`, key, 'PUT', { version: null },
@@ -41,6 +58,11 @@ async function requestWithBody<T>(path: string, apiKey: string, method: string, 
   })
   if (!response.ok) throw new Error(`Request failed (${response.status})`)
   return response.json() as Promise<T>
+}
+
+async function requestNoContent(path: string, apiKey: string, method: string): Promise<void> {
+  const response = await fetch(path, { method, headers: authHeaders(apiKey), signal: AbortSignal.timeout(15_000) })
+  if (!response.ok) throw new Error(`Request failed (${response.status})`)
 }
 
 async function download(path: string, apiKey: string, filename: string) {

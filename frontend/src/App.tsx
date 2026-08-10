@@ -1,7 +1,8 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from './api'
-import type { Asset, AssetRisk, AuditEntry, FeedStatus, GraphAnomaly, GraphData, SiteSummary } from './types'
+import { AdminControls } from './AdminControls'
+import type { AdminControls as AdminControlData, Asset, AssetRisk, AuditEntry, FeedStatus, GraphAnomaly, GraphData, SiteSummary } from './types'
 
 const NetworkGraph = lazy(() =>
   import('./NetworkGraph').then((module) => ({ default: module.NetworkGraph })),
@@ -26,6 +27,7 @@ export default function App() {
   const [inventoryAsOf, setInventoryAsOf] = useState(0)
   const [feedStatus, setFeedStatus] = useState<FeedStatus | null>(null)
   const [auditEvents, setAuditEvents] = useState<AuditEntry[] | null>(null)
+  const [adminControls, setAdminControls] = useState<AdminControlData | null>(null)
 
   const refresh = useCallback(async (key: string) => {
     setLoading(true)
@@ -39,12 +41,14 @@ export default function App() {
       setAnomalies(anomalyRows)
       setInventoryAsOf(Date.now())
       try {
-        const [feeds, audit] = await Promise.all([api.feedStatus(key), api.audit(key)])
+        const [feeds, audit, controls] = await Promise.all([api.feedStatus(key), api.audit(key), api.adminControls(key)])
         setFeedStatus(feeds)
         setAuditEvents(audit)
+        setAdminControls(controls)
       } catch {
         setFeedStatus(null)
         setAuditEvents(null)
+        setAdminControls(null)
         setView((current) => (current === 'administration' ? 'inventory' : current))
       }
     } catch (reason) {
@@ -188,7 +192,7 @@ export default function App() {
             </Suspense>
           </section>
         ) : (
-          <AdministrationPanel feeds={feedStatus} events={auditEvents ?? []} />
+          <div className="space-y-5">{adminControls && <AdminControls apiKey={apiKey} controls={adminControls} refresh={() => refresh(apiKey)} reportError={setError} />}<AdministrationPanel feeds={feedStatus} events={auditEvents ?? []} /></div>
         )}
       </main>
       {selected && <AssetDrawer asset={selected} close={() => setSelected(null)} canAdmin={auditEvents !== null} baselineFirmware={baselineFirmware} />}
