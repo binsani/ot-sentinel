@@ -37,8 +37,10 @@ jobs:
           cache: pip
       - run: pip install uv==0.12.3
       - run: uv sync --frozen --extra dev
-      - run: uv run ruff check .
+      - run: uv run ruff check . ../scripts/verify-release-version.py
       - run: uv run mypy app
+      - run: uv run python ../scripts/verify-release-version.py --expected 1.0.0
+      - run: uv build --out-dir "$RUNNER_TEMP/backend-dist"
       - run: uv run alembic upgrade head
       - run: uv run pytest
       - name: Backup and isolated restore rehearsal
@@ -75,6 +77,7 @@ jobs:
       - run: uv run python ../scripts/fetch-test-captures.py
       - run: uv run ruff check . ../scripts/fetch-test-captures.py
       - run: uv run python ../scripts/verify-passive-release.py
+      - run: uv build --out-dir "$RUNNER_TEMP/sensor-dist"
       - run: uv run pytest
   frontend:
     runs-on: ubuntu-latest

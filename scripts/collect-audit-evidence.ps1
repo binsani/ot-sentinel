@@ -33,12 +33,16 @@ $evidenceFiles = @(
     '.github/workflows/ci.yml',
     '.github/workflows/codeql.yml',
     '.github/workflows/release.yml',
+    'RELEASE_NOTES.md',
+    'docs/release-checklist.md',
     'docs/architecture.md',
     'docs/authentication.md',
     'docs/backup-restore.md',
     'docs/field-acceptance.md',
     'docs/threat-model.md',
-    'SECURITY.md'
+    'SECURITY.md',
+    'scripts/verify-passive-release.py',
+    'scripts/verify-release-version.py'
 )
 $hashes = foreach ($relativePath in $evidenceFiles) {
     $absolutePath = Join-Path $repositoryRoot $relativePath

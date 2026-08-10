@@ -88,7 +88,7 @@ def build_cyclonedx(
                     {
                         "type": "application",
                         "name": "OT-Sentinel",
-                        "version": "0.3.0",
+                        "version": "1.0.0",
                     }
                 ]
             },
