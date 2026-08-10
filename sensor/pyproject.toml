@@ -12,7 +12,7 @@ dependencies = ["scapy>=2.6,<3"]
 ot-sentinel-sensor = "ot_sentinel_sensor.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=9.0.3,<10", "ruff>=0.8,<1"]
+dev = ["pytest>=9.1.1,<10", "ruff>=0.8,<1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ot_sentinel_sensor"]
