@@ -16,6 +16,10 @@ jobs:
       ADMIN_API_KEY: release-build-placeholder
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python scripts/verify-passive-release.py
       - run: docker compose --profile sensor --profile feeds config --quiet
       - run: docker compose --profile sensor --profile feeds build
   publish:
