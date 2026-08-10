@@ -16,7 +16,7 @@ from app.siem import router as siem_router
 
 app = FastAPI(
     title=get_settings().app_name,
-    version="0.3.0",
+    version="1.0.0",
     description="Passive OT/ICS asset inventory and vulnerability correlation API.",
 )
 app.include_router(ingestion_router)

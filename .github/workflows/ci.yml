@@ -37,8 +37,9 @@ jobs:
           cache: pip
       - run: pip install uv==0.12.3
       - run: uv sync --frozen --extra dev
-      - run: uv run ruff check .
+      - run: uv run ruff check . ../scripts/verify-release-version.py
       - run: uv run mypy app
+      - run: uv run python ../scripts/verify-release-version.py --expected 1.0.0
       - run: uv run alembic upgrade head
       - run: uv run pytest
       - name: Backup and isolated restore rehearsal
