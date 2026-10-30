@@ -65,7 +65,7 @@ jobs:
       - run: tar -czf release-artifacts/ot-sentinel-frontend-${{ github.ref_name }}.tar.gz -C frontend/dist .
       - working-directory: release-artifacts
         run: sha256sum * > SHA256SUMS
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: release-artifacts
           path: release-artifacts/*

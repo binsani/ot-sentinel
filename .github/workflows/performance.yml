@@ -68,7 +68,7 @@ jobs:
           --p95-budget-ms 3000
           --max-error-rate 0.005
           --output ../performance-results.json
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: performance-results
