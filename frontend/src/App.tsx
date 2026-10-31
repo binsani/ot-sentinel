@@ -1,6 +1,7 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from './api'
+import { PublicSimulator } from './PublicSimulator'
 import { AdminControls } from './AdminControls'
 import type { AdminControls as AdminControlData, Asset, AssetRisk, AuditEntry, FeedStatus, GraphAnomaly, GraphData, SiteSummary } from './types'
 
@@ -11,6 +12,7 @@ const NetworkGraph = lazy(() =>
 type View = 'inventory' | 'risk' | 'anomalies' | 'sites' | 'graph' | 'administration'
 
 export default function App() {
+  const [publicDemo, setPublicDemo] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [draftKey, setDraftKey] = useState('')
   const [assets, setAssets] = useState<Asset[]>([])
@@ -126,8 +128,10 @@ export default function App() {
   ).length
   const driftCount = assets.filter((asset) => asset.firmware_drift).length
 
+  if (publicDemo) return <PublicSimulator onExit={() => setPublicDemo(false)} />
+
   if (!apiKey) {
-    return <AccessGate draftKey={draftKey} setDraftKey={setDraftKey} connect={connect} error={error} />
+    return <AccessGate draftKey={draftKey} setDraftKey={setDraftKey} connect={connect} error={error} onPublicDemo={() => setPublicDemo(true)} />
   }
 
   return (
@@ -200,8 +204,8 @@ export default function App() {
   )
 }
 
-function AccessGate({ draftKey, setDraftKey, connect, error }: { draftKey: string; setDraftKey: (value: string) => void; connect: (event: FormEvent) => void; error: string }) {
-  return <main className="grid min-h-screen place-items-center bg-slate-950 p-5 text-slate-100"><form onSubmit={connect} className="panel w-full max-w-md p-7"><div className="mb-6 grid size-11 place-items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 font-mono font-bold text-emerald-300">OT</div><h1 className="text-xl font-semibold">Access OT-Sentinel</h1><p className="mt-2 text-sm leading-6 text-slate-400">Enter an OIDC access token or an enabled bootstrap API key. The credential remains in memory and is cleared when this page closes.</p>{error && <p role="alert" className="mt-4 text-sm text-rose-300">{error}</p>}<label htmlFor="api-key" className="mt-6 block text-xs font-medium uppercase tracking-wider text-slate-400">Access token or API key</label><input id="api-key" type="password" autoComplete="off" required className="input mt-2 w-full" value={draftKey} onChange={(event) => setDraftKey(event.target.value)} /><button type="submit" className="button-primary mt-4 w-full">Connect securely</button></form></main>
+function AccessGate({ draftKey, setDraftKey, connect, error, onPublicDemo }: { draftKey: string; setDraftKey: (value: string) => void; connect: (event: FormEvent) => void; error: string; onPublicDemo: () => void }) {
+  return <main className="grid min-h-screen place-items-center bg-slate-950 p-5 text-slate-100"><form onSubmit={connect} className="panel w-full max-w-md p-7"><div className="mb-6 grid size-11 place-items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 font-mono font-bold text-emerald-300">OT</div><h1 className="text-xl font-semibold">Access OT-Sentinel</h1><p className="mt-2 text-sm leading-6 text-slate-400">Enter an OIDC access token or an enabled bootstrap API key. The credential remains in memory and is cleared when this page closes.</p>{error && <p role="alert" className="mt-4 text-sm text-rose-300">{error}</p>}<label htmlFor="api-key" className="mt-6 block text-xs font-medium uppercase tracking-wider text-slate-400">Access token or API key</label><input id="api-key" type="password" autoComplete="off" required className="input mt-2 w-full" value={draftKey} onChange={(event) => setDraftKey(event.target.value)} /><button type="submit" className="button-primary mt-4 w-full">Connect securely</button><button type="button" className="button-secondary mt-3 w-full" onClick={onPublicDemo}>Try public educational simulator (no login)</button></form></main>
 }
 
 function Metric({ label, value, detail, warning = false }: { label: string; value: number; detail: string; warning?: boolean }) {
