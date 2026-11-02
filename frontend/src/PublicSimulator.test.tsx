@@ -1,21 +1,26 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { PublicSimulator } from './PublicSimulator'
+import { PublicSimulator, toggleSimulatedDevice } from './PublicSimulator'
 
 describe('public synthetic simulator', () => {
-  it('starts and stops a synthetic device without credentials', () => {
-    render(<PublicSimulator onExit={() => undefined} />)
-    expect(screen.getAllByText('Running (simulated)')).toHaveLength(2)
-    fireEvent.click(screen.getByRole('button', { name: 'Stop simulated Cooling circulation pump' }))
-    expect(screen.getByText('P-101 simulated stop')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Reset simulation' }))
-    expect(screen.getByText('Synthetic simulation reset')).toBeTruthy()
+  it('renders no-login simulated controls without making API requests', () => {
+    const markup = renderToStaticMarkup(<PublicSimulator onExit={() => undefined} />)
+    expect(markup).toContain('no login required')
+    expect(markup).toContain('Simulate stop')
+    expect(markup).toContain('Simulate start')
+    expect(markup).toContain('Return to secure access')
+    expect(markup).toContain('No API requests')
   })
 
-  it('exposes a return to secure access action', () => {
-    let exited = false
-    render(<PublicSimulator onExit={() => { exited = true }} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Return to secure access' }))
-    expect(exited).toBe(true)
+  it('toggles only the requested synthetic device without mutating input', () => {
+    const initial = [
+      { id: 'P-101', label: 'Pump', running: true },
+      { id: 'P-102', label: 'Backup', running: false },
+    ]
+    const next = toggleSimulatedDevice(initial, 'P-101')
+    expect(next[0].running).toBe(false)
+    expect(next[1].running).toBe(false)
+    expect(initial[0].running).toBe(true)
+    expect(toggleSimulatedDevice(next, 'P-101')[0].running).toBe(true)
   })
 })
