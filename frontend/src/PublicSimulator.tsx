@@ -1,6 +1,9 @@
 import { useState } from 'react'
 
-type Device = { id: string; label: string; running: boolean }
+export type Device = { id: string; label: string; running: boolean }
+export function toggleSimulatedDevice(devices: Device[], id: string): Device[] {
+  return devices.map((item) => item.id === id ? { ...item, running: !item.running } : item)
+}
 const initialDevices: Device[] = [
   { id: 'P-101', label: 'Cooling circulation pump', running: true },
   { id: 'P-102', label: 'Backup circulation pump', running: false },
@@ -13,7 +16,7 @@ export function PublicSimulator({ onExit }: { onExit: () => void }) {
   const toggle = (id: string) => {
     const device = devices.find((item) => item.id === id)
     if (!device) return
-    setDevices((current) => current.map((item) => item.id === id ? { ...item, running: !item.running } : item))
+    setDevices((current) => toggleSimulatedDevice(current, id))
     setEvents((current) => [`${id} simulated ${device.running ? 'stop' : 'start'}`, ...current].slice(0, 8))
   }
   const reset = () => {
