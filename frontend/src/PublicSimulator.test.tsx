@@ -5,7 +5,7 @@ import { PublicSimulator } from './PublicSimulator'
 describe('public synthetic simulator', () => {
   it('starts and stops a synthetic device without credentials', () => {
     render(<PublicSimulator onExit={() => undefined} />)
-    expect(screen.getByText('Running (simulated)')).toBeTruthy()
+    expect(screen.getAllByText('Running (simulated)')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Stop simulated Cooling circulation pump' }))
     expect(screen.getByText('P-101 simulated stop')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Reset simulation' }))
